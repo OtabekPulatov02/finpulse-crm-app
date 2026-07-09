@@ -6,6 +6,7 @@ import {
 import { useEffect } from "react";
 import { Avatar, Menu, MenuDivider, MenuItem, Toaster, toast } from "./ui";
 import { hydrateFromBot, resetTasksStore, useTasks } from "../store/tasks";
+import { hydrateClients, resetClientsStore } from "../store/clients";
 import { clearSession, ROLE_LABEL, useSession } from "../auth";
 
 const ALL_NAV = [
@@ -26,7 +27,7 @@ const notifications = [
 export default function Layout() {
   const tasks = useTasks();
   const session = useSession();
-  useEffect(() => { void hydrateFromBot(); }, []);
+  useEffect(() => { void hydrateFromBot(); void hydrateClients(); }, []);
   const activeCount = tasks.filter((t) => t.status === "Новая" || t.status === "В работе").length;
   const navigate = useNavigate();
   const role = session?.role || "admin";
@@ -37,6 +38,7 @@ export default function Layout() {
   function logout() {
     clearSession();
     resetTasksStore();
+    resetClientsStore();
     navigate("/login", { replace: true });
   }
 

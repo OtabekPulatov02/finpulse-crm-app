@@ -28,6 +28,32 @@ export interface BotTask {
   assignee: string | null;
   createdAt: string | null;
   files: number;
+  dueDate?: string | null;
+}
+
+export interface CrmClient {
+  id: string;
+  company: string;
+  position: string | null;
+  phone: string | null;
+  status: string;
+  assignedTo: string | null;
+  tariff: string | null;
+  note: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  telegramId?: number | null;
+}
+
+export interface CalendarEntry {
+  num: number;
+  company: string;
+  text: string;
+  status: BotStatus;
+  assignee: string | null;
+  dueDate: string;
+  overdue: boolean;
+  dueToday: boolean;
 }
 
 export interface LogRow {
@@ -79,6 +105,51 @@ export async function pushBotStatus(num: number, status: BotStatus, assignee?: s
   if (r.status === 401) clearSession();
   return r.json() as Promise<{ ok: boolean; error?: string }>;
 }
+
+async function post<T>(body: Record<string, unknown>): Promise<T> {
+  const r = await fetch(API, {
+    method: "POST",
+    headers: { "content-type": "application/json", ...authHeaders() },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(10000),
+  });
+  if (r.status === 401) clearSession();
+  return r.json() as Promise<T>;
+}
+
+/* ---------------- Клиенты ---------------- */
+
+export const fetchClients = () =>
+  get<{ ok: boolean; clients: CrmClient[] }>("r=clients").then((d) => d.clients ?? []);
+
+export interface ClientResult { ok: boolean; id?: string; merged?: boolean; client?: CrmClient; error?: string }
+
+export const createClientRequest = (data: {
+  company: string; phone?: string; position?: string; tariff?: string; assignedTo?: string; note?: string;
+}) => post<ClientResult>({ action: "client_create", ...data });
+
+export const updateClientRequest = (id: string, patch: Partial<Pick<CrmClient, "status" | "assignedTo" | "tariff" | "note" | "position">>) =>
+  post<ClientResult>({ action: "client_update", id, patch });
+
+export const deleteClientRequest = (id: string) =>
+  post<{ ok: boolean; id?: string; error?: string }>({ action: "client_delete", id });
+
+/* ---------------- Задачи ---------------- */
+
+export interface TaskResult { ok: boolean; task?: BotTask; error?: string }
+
+export const createTaskRequest = (data: {
+  clientId?: string; company?: string; text: string; assignee?: string; dueDate?: string | null;
+}) => post<TaskResult>({ action: "task_create", ...data });
+
+export const updateTaskRequest = (num: number, patch: Partial<Pick<BotTask, "text" | "assignee" | "company" | "dueDate">>) =>
+  post<TaskResult>({ action: "task_update", num, patch });
+
+export const deleteTaskRequest = (num: number) =>
+  post<{ ok: boolean; num?: number; error?: string }>({ action: "task_delete", num });
+
+export const fetchCalendar = () =>
+  get<{ ok: boolean; calendar: CalendarEntry[] }>("r=calendar").then((d) => d.calendar ?? []);
 
 /* ---------------- Авторизация ---------------- */
 export interface LoginResult { ok: boolean; token?: string; role?: string; name?: string; company?: string; error?: string }

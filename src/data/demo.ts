@@ -17,10 +17,12 @@ export interface Task {
   id: number;
   title: string;
   client: string;
+  clientId?: string | null;
   assignee: string;
   status: TaskStatus;
   priority: Priority;
   due: string;
+  dueDate?: string | null;
   fromBot?: boolean;
   fromCalendar?: boolean;
   description?: string;
