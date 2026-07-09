@@ -123,30 +123,54 @@ export function Toggle({ defaultChecked = true }: { defaultChecked?: boolean }) 
 
 /* ---------- Dropdown menu ---------- */
 import { useRef } from "react";
+import { createPortal } from "react-dom";
 
 export function Menu({ trigger, children }: { trigger: ReactNode; children: ReactNode }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const triggerRef = useRef<HTMLSpanElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     if (!open) return;
+    const MENU_W = 224; // w-56
+    const update = () => {
+      const r = triggerRef.current?.getBoundingClientRect();
+      if (!r) return;
+      const left = Math.min(Math.max(r.right - MENU_W, 8), window.innerWidth - MENU_W - 8);
+      setPos({ top: r.bottom + 4, left });
+    };
+    update();
     const h = (e: MouseEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+      if (triggerRef.current?.contains(e.target as Node)) return;
+      if (menuRef.current?.contains(e.target as Node)) return;
+      setOpen(false);
     };
     document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
+    window.addEventListener("scroll", update, true);
+    window.addEventListener("resize", update);
+    return () => {
+      document.removeEventListener("mousedown", h);
+      window.removeEventListener("scroll", update, true);
+      window.removeEventListener("resize", update);
+    };
   }, [open]);
+
   return (
-    <div ref={ref} className="relative inline-block">
-      <span onClick={(e) => { e.stopPropagation(); setOpen(!open); }}>{trigger}</span>
-      {open && (
+    <span ref={triggerRef} className="relative inline-block" onClick={(e) => { e.stopPropagation(); setOpen(!open); }}>
+      {trigger}
+      {open && pos && createPortal(
         <div
-          className="absolute right-0 z-40 mt-1 w-56 overflow-hidden rounded-xl border border-slate-200 bg-white py-1.5 shadow-xl"
+          ref={menuRef}
+          style={{ position: "fixed", top: pos.top, left: pos.left }}
+          className="z-50 w-56 overflow-hidden rounded-xl border border-slate-200 bg-white py-1.5 shadow-xl"
           onClick={(e) => { e.stopPropagation(); setOpen(false); }}
         >
           {children}
-        </div>
+        </div>,
+        document.body
       )}
-    </div>
+    </span>
   );
 }
 
