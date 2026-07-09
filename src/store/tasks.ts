@@ -72,7 +72,7 @@ export async function hydrateFromBot() {
       due: isoToDisplayDue(b.dueDate),
       dueDate: b.dueDate ?? null,
       fromBot: true,
-      source: "bot" as const,
+      source: b.source === "crm" ? "crm" as const : "bot" as const,
       created: fmtTs(b.createdAt),
     }));
     live.forEach((t) => liveIds.add(t.id));
