@@ -5,7 +5,7 @@ import {
 } from "lucide-react";
 import { useEffect } from "react";
 import { Avatar, Menu, MenuDivider, MenuItem, Toaster, toast } from "./ui";
-import { hydrateFromBot, useTasks } from "../store/tasks";
+import { hydrateFromBot, resetTasksStore, useTasks } from "../store/tasks";
 import { clearSession, ROLE_LABEL, useSession } from "../auth";
 
 const ALL_NAV = [
@@ -36,6 +36,7 @@ export default function Layout() {
 
   function logout() {
     clearSession();
+    resetTasksStore();
     navigate("/login", { replace: true });
   }
 

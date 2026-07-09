@@ -24,6 +24,16 @@ export function useTasks(): Task[] {
 
 export const isLiveTask = (id: number) => liveIds.has(id);
 
+/* Сброс стора при смене сессии (логин/логаут/смена роли в той же вкладке) —
+   иначе данные, полученные под одной ролью (например, реальные задачи
+   супер-админа), остаются видны после переключения на гостя/клиента. */
+export function resetTasksStore() {
+  hydrated = false;
+  liveIds.clear();
+  tasks = [...initialTasks];
+  emit();
+}
+
 const fromBotStatus: Record<BotStatus, TaskStatus> = {
   new: "Новая", in_progress: "В работе", done: "Выполнена",
 };
