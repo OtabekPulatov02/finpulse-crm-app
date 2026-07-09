@@ -6,7 +6,7 @@ import {
 import { useEffect, useState } from "react";
 import { Avatar, Menu, MenuDivider, MenuItem, Toaster, toast } from "./ui";
 import { displayStatus, hydrateFromBot, isOverdue, resetTasksStore, useTasks } from "../store/tasks";
-import { hydrateClients, resetClientsStore } from "../store/clients";
+import { hydrateClients, resetClientsStore, useClients } from "../store/clients";
 import { resetEmployeesStore } from "../store/employees";
 import { clearSession, ROLE_LABEL, useSession } from "../auth";
 
@@ -93,12 +93,42 @@ function SidebarNav({
 
 export default function Layout() {
   const tasks = useTasks();
+  const clients = useClients();
   const session = useSession();
   const location = useLocation();
+  const navigate = useNavigate();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  useEffect(() => { setMobileNavOpen(false); }, [location.pathname]);
+  const [searchQ, setSearchQ] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  useEffect(() => { setMobileNavOpen(false); setSearchOpen(false); setSearchQ(""); }, [location.pathname]);
   useEffect(() => { void hydrateFromBot(); void hydrateClients(); }, []);
   const activeCount = tasks.filter((t) => t.status === "Новая" || t.status === "В работе").length;
+
+  const searchTerm = searchQ.trim().toLowerCase();
+  const matchedClients = searchTerm
+    ? clients.filter((c) =>
+        c.company.toLowerCase().includes(searchTerm) ||
+        (c.phone ?? "").toLowerCase().includes(searchTerm) ||
+        (c.position ?? "").toLowerCase().includes(searchTerm)
+      ).slice(0, 5)
+    : [];
+  const matchedTasks = searchTerm
+    ? tasks.filter((t) =>
+        t.title.toLowerCase().includes(searchTerm) ||
+        t.client.toLowerCase().includes(searchTerm) ||
+        t.assignee.toLowerCase().includes(searchTerm)
+      ).slice(0, 5)
+    : [];
+  const hasSearchResults = matchedClients.length > 0 || matchedTasks.length > 0;
+
+  function goToClient(id: string) {
+    setSearchOpen(false); setSearchQ("");
+    navigate(`/clients?open=${id}`);
+  }
+  function goToTask(id: number) {
+    setSearchOpen(false); setSearchQ("");
+    navigate(`/tasks?open=${id}`);
+  }
   const notifications = [
     ...tasks
       .filter((t) => t.fromBot && displayStatus(t) === "Новая")
@@ -119,7 +149,6 @@ export default function Layout() {
   ]
     .sort((a, b) => b.id - a.id)
     .slice(0, 3);
-  const navigate = useNavigate();
   const role = session?.role || "admin";
   const nav = ALL_NAV.filter((item) => !item.hideFor.includes(role));
   const displayName = session?.name || "Ибрагимова Юлдуз";
@@ -171,11 +200,58 @@ export default function Layout() {
             <MenuIcon className="size-5" />
           </button>
           <div className="relative w-full max-w-sm">
-            <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
+            <Search className="absolute top-1/2 left-3 z-10 size-4 -translate-y-1/2 text-slate-400" />
             <input
-              placeholder="Поиск…"
+              value={searchQ}
+              onChange={(e) => { setSearchQ(e.target.value); setSearchOpen(true); }}
+              onFocus={() => searchQ && setSearchOpen(true)}
+              onBlur={() => setTimeout(() => setSearchOpen(false), 150)}
+              onKeyDown={(e) => { if (e.key === "Escape") { setSearchQ(""); setSearchOpen(false); } }}
+              placeholder="Поиск клиентов и задач…"
               className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pr-3 pl-9 text-[13px] transition focus:border-brand-500 focus:bg-white focus:ring-2 focus:ring-brand-100 focus:outline-none"
             />
+            {searchOpen && searchTerm && (
+              <div className="absolute top-full left-0 z-30 mt-1.5 max-h-96 w-full min-w-72 overflow-y-auto rounded-xl border border-slate-200 bg-white py-1.5 shadow-xl">
+                {hasSearchResults ? (
+                  <>
+                    {matchedClients.length > 0 && (
+                      <>
+                        <div className="px-3.5 pt-1.5 pb-1 text-[11px] font-semibold tracking-wider text-slate-400 uppercase">Клиенты</div>
+                        {matchedClients.map((c) => (
+                          <button key={c.id} onMouseDown={() => goToClient(c.id)}
+                            className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left hover:bg-slate-50">
+                            <Avatar name={c.company.replace(/^(ООО|АО|ИП|MCHJ|OOO)\s*«?/, "")} />
+                            <div className="min-w-0">
+                              <div className="truncate text-[13px] font-medium">{c.company}</div>
+                              <div className="truncate text-[11px] text-slate-400">{c.phone ?? "без телефона"}</div>
+                            </div>
+                          </button>
+                        ))}
+                      </>
+                    )}
+                    {matchedTasks.length > 0 && (
+                      <>
+                        <div className="px-3.5 pt-2 pb-1 text-[11px] font-semibold tracking-wider text-slate-400 uppercase">Задачи</div>
+                        {matchedTasks.map((t) => (
+                          <button key={t.id} onMouseDown={() => goToTask(t.id)}
+                            className="flex w-full items-start gap-2.5 px-3.5 py-2 text-left hover:bg-slate-50">
+                            <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg bg-violet-50 text-violet-600">
+                              <ListTodo className="size-3.5" />
+                            </span>
+                            <div className="min-w-0">
+                              <div className="truncate text-[13px] font-medium">{t.title}</div>
+                              <div className="truncate text-[11px] text-slate-400">{t.client} · {t.assignee}</div>
+                            </div>
+                          </button>
+                        ))}
+                      </>
+                    )}
+                  </>
+                ) : (
+                  <div className="px-3.5 py-6 text-center text-[12.5px] text-slate-400">Ничего не найдено</div>
+                )}
+              </div>
+            )}
           </div>
           <div className="ml-auto flex items-center gap-1.5">
             <Menu trigger={
