@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import type React from "react";
 
 const tones = {
   blue: "bg-brand-50 text-brand-600 border-brand-200",
@@ -21,9 +22,9 @@ export function Badge({ tone = "gray", children }: { tone?: Tone; children: Reac
   );
 }
 
-export function Card({ className = "", children }: { className?: string; children: ReactNode }) {
+export function Card({ className = "", children, ...rest }: { className?: string; children: ReactNode } & React.HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={`rounded-xl border border-slate-200 bg-white shadow-sm ${className}`}>
+    <div {...rest} className={`rounded-xl border border-slate-200 bg-white shadow-sm ${className}`}>
       {children}
     </div>
   );
@@ -117,5 +118,108 @@ export function Toggle({ defaultChecked = true }: { defaultChecked?: boolean }) 
     >
       <span className={`absolute top-[3px] size-4 rounded-full bg-white shadow transition-transform ${on ? "translate-x-[19px]" : "translate-x-[3px]"}`} />
     </button>
+  );
+}
+
+/* ---------- Dropdown menu ---------- */
+import { useRef } from "react";
+
+export function Menu({ trigger, children }: { trigger: ReactNode; children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const h = (e: MouseEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, [open]);
+  return (
+    <div ref={ref} className="relative inline-block">
+      <span onClick={(e) => { e.stopPropagation(); setOpen(!open); }}>{trigger}</span>
+      {open && (
+        <div
+          className="absolute right-0 z-40 mt-1 w-56 overflow-hidden rounded-xl border border-slate-200 bg-white py-1.5 shadow-xl"
+          onClick={(e) => { e.stopPropagation(); setOpen(false); }}
+        >
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function MenuItem({
+  children, onClick, danger, icon,
+}: { children: ReactNode; onClick?: () => void; danger?: boolean; icon?: ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-[13px] font-medium transition-colors ${
+        danger ? "text-red-600 hover:bg-red-50" : "text-slate-700 hover:bg-slate-50"
+      }`}
+    >
+      {icon}
+      {children}
+    </button>
+  );
+}
+
+export function MenuDivider() {
+  return <div className="my-1 border-t border-slate-100" />;
+}
+
+/* ---------- Form primitives ---------- */
+export function Field({ label, required, children }: { label: string; required?: boolean; children: ReactNode }) {
+  return (
+    <label className="block">
+      <span className="mb-1.5 block text-[13px] font-medium text-slate-600">
+        {label} {required && <span className="text-red-500">*</span>}
+      </span>
+      {children}
+    </label>
+  );
+}
+
+const ctl = "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13.5px] transition focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none";
+
+export function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
+  return <input {...props} className={`${ctl} ${props.className ?? ""}`} />;
+}
+export function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
+  return <select {...props} className={`${ctl} ${props.className ?? ""}`} />;
+}
+export function Textarea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  return <textarea rows={3} {...props} className={`${ctl} resize-y ${props.className ?? ""}`} />;
+}
+
+/* ---------- Confirm modal ---------- */
+export function ConfirmModal({
+  open, onClose, onConfirm, title, text, confirmLabel = "Удалить", tone = "danger", icon,
+}: {
+  open: boolean; onClose: () => void; onConfirm: () => void;
+  title: string; text: string; confirmLabel?: string; tone?: "danger" | "warning"; icon?: ReactNode;
+}) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 p-5 backdrop-blur-sm" onClick={onClose}>
+      <div className="w-full max-w-sm rounded-xl bg-white p-6 text-center shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className={`mx-auto mb-4 flex size-12 items-center justify-center rounded-full ${tone === "danger" ? "bg-red-50 text-red-600" : "bg-amber-50 text-amber-600"}`}>
+          {icon}
+        </div>
+        <h2 className="text-base font-semibold">{title}</h2>
+        <p className="mt-2 text-[13px] leading-relaxed text-slate-500">{text}</p>
+        <div className="mt-5 flex justify-center gap-2">
+          <button onClick={onClose} className="rounded-lg border border-slate-200 px-4 py-2 text-[13px] font-medium hover:bg-slate-50">Отмена</button>
+          <button
+            onClick={() => { onConfirm(); onClose(); }}
+            className={`rounded-lg px-4 py-2 text-[13px] font-medium text-white ${tone === "danger" ? "bg-red-600 hover:bg-red-700" : "bg-amber-500 hover:bg-amber-600"}`}
+          >
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

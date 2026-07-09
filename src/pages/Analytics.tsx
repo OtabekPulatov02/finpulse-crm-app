@@ -8,10 +8,9 @@ const perf = [
   { name: "Ольга Никитина", done: 4, avg: "3,2 дня", overdue: 1, ontime: 80 },
 ];
 const statuses = [
-  { label: "В работе", n: 20, w: 64, c: "bg-brand-500" },
+  { label: "В работе", n: 24, w: 77, c: "bg-brand-500" },
   { label: "Выполнены", n: 19, w: 61, c: "bg-emerald-500" },
-  { label: "Ожидание", n: 11, w: 35, c: "bg-amber-500" },
-  { label: "Новые", n: 7, w: 23, c: "bg-violet-500" },
+  { label: "Новые", n: 14, w: 45, c: "bg-violet-500" },
   { label: "Отменены", n: 5, w: 16, c: "bg-slate-400" },
 ];
 const kpi = [

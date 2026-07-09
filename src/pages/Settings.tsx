@@ -119,7 +119,7 @@ export default function Settings() {
         <div className="grid grid-cols-2 gap-4 max-lg:grid-cols-1">
           <DictCard title="Статусы задач" placeholder="Новый статус" items={[
             { label: "Новая", badge: "purple" }, { label: "В работе", badge: "blue" },
-            { label: "Ожидание", badge: "yellow" }, { label: "Выполнена", badge: "green" }, { label: "Отменена", badge: "gray" },
+            { label: "Выполнена", badge: "green" }, { label: "Отменена", badge: "gray" },
           ]} />
           <DictCard title="Приоритеты" placeholder="Новый приоритет" items={[
             { label: "Низкий", badge: "gray" }, { label: "Средний", badge: "blue" },

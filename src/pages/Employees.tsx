@@ -1,5 +1,6 @@
+import { useState } from "react";
 import { UserPlus } from "lucide-react";
-import { Avatar, Badge, Card } from "../components/ui";
+import { Avatar, Card, Field, Input, Modal, Select, toast } from "../components/ui";
 
 const team = [
   { name: "Ибрагимова Юлдуз Ахмедовна", role: "Главный бухгалтер · супер-админ", load: 62, clients: 8, active: 6, done: 214 },
@@ -10,7 +11,12 @@ const team = [
   { name: "Никитина Ольга Сергеевна", role: "Налоговый консультант", load: 58, clients: 6, active: 5, done: 89 },
 ];
 
+const POSITIONS = ["Бухгалтер", "Главный бухгалтер", "Бухгалтер по зарплате", "Младший бухгалтер", "Налоговый консультант"];
+const ROLES = ["Бухгалтер", "Руководитель", "Администратор"];
+
 export default function Employees() {
+  const [open, setOpen] = useState(false);
+
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -18,7 +24,8 @@ export default function Employees() {
           <h1 className="text-2xl font-bold tracking-tight">Сотрудники</h1>
           <p className="mt-0.5 text-sm text-slate-500">{team.length} сотрудников · средняя загрузка 67%</p>
         </div>
-        <button className="flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-brand-700">
+        <button onClick={() => setOpen(true)}
+          className="flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-brand-700">
           <UserPlus className="size-4" /> Добавить сотрудника
         </button>
       </div>
@@ -47,8 +54,37 @@ export default function Employees() {
           </Card>
         ))}
       </div>
+
+      <Modal open={open} onClose={() => setOpen(false)} title="Новый сотрудник" wide
+        footer={
+          <>
+            <button onClick={() => setOpen(false)} className="rounded-lg border border-slate-200 px-4 py-2 text-[13px] font-medium hover:bg-slate-50">Отмена</button>
+            <button
+              onClick={() => { toast("Сотрудник добавлен — приглашение отправлено на почту"); setOpen(false); }}
+              className="flex items-center gap-1.5 rounded-lg bg-brand-600 px-4 py-2 text-[13px] font-medium text-white hover:bg-brand-700">
+              <UserPlus className="size-4" /> Добавить
+            </button>
+          </>
+        }>
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
+            <Field label="Фамилия" required><Input placeholder="Петрова" autoFocus /></Field>
+            <Field label="Имя и отчество" required><Input placeholder="Мария Сергеевна" /></Field>
+          </div>
+          <div className="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
+            <Field label="Должность"><Select>{POSITIONS.map((p) => <option key={p}>{p}</option>)}</Select></Field>
+            <Field label="Роль в системе"><Select>{ROLES.map((r) => <option key={r}>{r}</option>)}</Select></Field>
+          </div>
+          <div className="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
+            <Field label="Электронная почта" required><Input type="email" placeholder="m.petrova@finpulse.uz" /></Field>
+            <Field label="Телефон"><Input type="tel" placeholder="+998 90 000-00-00" /></Field>
+          </div>
+          <label className="flex items-center gap-2 text-[13px]">
+            <input type="checkbox" defaultChecked className="size-4 accent-brand-600" />
+            Отправить приглашение на почту
+          </label>
+        </div>
+      </Modal>
     </div>
   );
 }
-
-export { Badge };

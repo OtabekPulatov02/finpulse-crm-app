@@ -1,13 +1,14 @@
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import {
-  BarChart3, Bell, Building2, CalendarDays, LayoutDashboard,
-  ListTodo, Search, Send, Settings, Users,
+  AlertCircle, BarChart3, Bell, Building2, CalendarDays, CheckCheck, ChevronDown,
+  LayoutDashboard, ListTodo, LogOut, Search, Send, Settings, User, Users,
 } from "lucide-react";
-import { Avatar, Toaster } from "./ui";
+import { Avatar, Menu, MenuDivider, MenuItem, Toaster, toast } from "./ui";
+import { useTasks } from "../store/tasks";
 
 const nav = [
   { to: "/dashboard", label: "Дашборд", icon: LayoutDashboard },
-  { to: "/tasks", label: "Задачи", icon: ListTodo, count: 37 },
+  { to: "/tasks", label: "Задачи", icon: ListTodo, count: true },
   { to: "/calendar", label: "Календарь", icon: CalendarDays },
   { to: "/clients", label: "Клиенты", icon: Building2 },
   { to: "/employees", label: "Сотрудники", icon: Users },
@@ -15,7 +16,16 @@ const nav = [
   { to: "/settings", label: "Настройки", icon: Settings },
 ];
 
+const notifications = [
+  { icon: Send, tone: "bg-brand-50 text-brand-600", title: "Новое обращение из Telegram: ООО «ТехноСфера»", time: "5 минут назад" },
+  { icon: AlertCircle, tone: "bg-red-50 text-red-600", title: "Просрочена задача «Ответ на требование ИФНС»", time: "1 час назад" },
+];
+
 export default function Layout() {
+  const tasks = useTasks();
+  const activeCount = tasks.filter((t) => t.status === "Новая" || t.status === "В работе").length;
+  const navigate = useNavigate();
+
   return (
     <div className="flex min-h-screen">
       <aside className="sticky top-0 flex h-screen w-60 shrink-0 flex-col border-r border-slate-200 bg-white max-lg:hidden">
@@ -43,7 +53,7 @@ export default function Layout() {
               {label}
               {count && (
                 <span className="ml-auto rounded-full bg-slate-100 px-2 text-[11px] font-semibold text-slate-500">
-                  {count}
+                  {activeCount}
                 </span>
               )}
             </NavLink>
@@ -83,12 +93,42 @@ export default function Layout() {
               className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pr-3 pl-9 text-[13px] transition focus:border-brand-500 focus:bg-white focus:ring-2 focus:ring-brand-100 focus:outline-none"
             />
           </div>
-          <div className="ml-auto flex items-center gap-2">
-            <button className="relative rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900">
-              <Bell className="size-[18px]" />
-              <span className="absolute top-1.5 right-1.5 size-2 rounded-full border-2 border-white bg-red-500" />
-            </button>
-            <Avatar name="Ибрагимова Юлдуз" />
+          <div className="ml-auto flex items-center gap-1.5">
+            <Menu trigger={
+              <button className="relative rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900">
+                <Bell className="size-[18px]" />
+                <span className="absolute top-1.5 right-1.5 size-2 rounded-full border-2 border-white bg-red-500" />
+              </button>
+            }>
+              <div className="px-3.5 pt-1 pb-2 text-xs font-semibold tracking-wider text-slate-400 uppercase">Уведомления</div>
+              {notifications.map((n, i) => (
+                <div key={i} className="flex items-start gap-2.5 px-3.5 py-2.5 hover:bg-slate-50">
+                  <span className={`mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg ${n.tone}`}>
+                    <n.icon className="size-3.5" />
+                  </span>
+                  <div>
+                    <div className="text-[12.5px] leading-snug font-medium">{n.title}</div>
+                    <div className="mt-0.5 text-[11px] text-slate-400">{n.time}</div>
+                  </div>
+                </div>
+              ))}
+              <MenuDivider />
+              <MenuItem icon={<CheckCheck className="size-4" />} onClick={() => toast("Все уведомления отмечены прочитанными")}>
+                Отметить всё прочитанным
+              </MenuItem>
+            </Menu>
+            <Menu trigger={
+              <button className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-100">
+                <Avatar name="Ибрагимова Юлдуз" />
+                <span className="text-[13px] font-medium max-sm:hidden">Юлдуз</span>
+                <ChevronDown className="size-3.5 text-slate-400" />
+              </button>
+            }>
+              <MenuItem icon={<User className="size-4" />} onClick={() => navigate("/employees")}>Мой профиль</MenuItem>
+              <MenuItem icon={<Settings className="size-4" />} onClick={() => navigate("/settings")}>Настройки</MenuItem>
+              <MenuDivider />
+              <MenuItem danger icon={<LogOut className="size-4" />} onClick={() => toast("В прототипе выход имитируется")}>Выйти</MenuItem>
+            </Menu>
           </div>
         </header>
         <main className="mx-auto w-full max-w-7xl flex-1 p-6">
