@@ -1,11 +1,22 @@
 /* Клиент API-моста: тот же бэкенд, что у Telegram-бота (finpulse-crm.vercel.app) */
+import { getToken, clearSession } from "./auth";
 
-const API = "https://finpulse-crm.vercel.app/api/crm";
+const ORIGIN = "https://finpulse-crm.vercel.app";
+const API = `${ORIGIN}/api/crm`;
+const AUTH_API = `${ORIGIN}/api/auth`;
 /* Временный общий ключ (до полноценных JWT-сессий из ролевой системы).
    ВАЖНО: это НЕ секрет в полном смысле — код фронта публичный, ключ виден
    в собранном JS-бандле любому желающему. Он лишь закрывает API от
    случайного/автоматического сканирования, а не от целенаправленного разбора. */
 const API_KEY = import.meta.env.VITE_CRM_API_KEY || "";
+
+function authHeaders(): Record<string, string> {
+  const h: Record<string, string> = {};
+  if (API_KEY) h["x-api-key"] = API_KEY;
+  const token = getToken();
+  if (token) h["authorization"] = `Bearer ${token}`;
+  return h;
+}
 
 export type BotStatus = "new" | "in_progress" | "done";
 
@@ -36,8 +47,9 @@ export interface PendingClient { company: string; phone: string | null; at: stri
 async function get<T>(params: string): Promise<T> {
   const r = await fetch(`${API}?${params}`, {
     signal: AbortSignal.timeout(8000),
-    headers: API_KEY ? { "x-api-key": API_KEY } : {},
+    headers: authHeaders(),
   });
+  if (r.status === 401) clearSession();
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   return r.json();
 }
@@ -59,12 +71,36 @@ export async function pushBotStatus(num: number, status: BotStatus, assignee?: s
     method: "POST",
     headers: {
       "content-type": "application/json",
-      ...(API_KEY ? { "x-api-key": API_KEY } : {}),
+      ...authHeaders(),
     },
     body: JSON.stringify({ action: "status", num, status, assignee }),
     signal: AbortSignal.timeout(10000),
   });
+  if (r.status === 401) clearSession();
   return r.json() as Promise<{ ok: boolean; error?: string }>;
+}
+
+/* ---------------- Авторизация ---------------- */
+export interface LoginResult { ok: boolean; token?: string; role?: string; name?: string; company?: string; error?: string }
+
+export async function loginRequest(identity: string, password: string): Promise<LoginResult> {
+  const r = await fetch(AUTH_API, {
+    method: "POST",
+    headers: { "content-type": "application/json", ...(API_KEY ? { "x-api-key": API_KEY } : {}) },
+    body: JSON.stringify({ action: "login", identity, password }),
+    signal: AbortSignal.timeout(10000),
+  });
+  return r.json();
+}
+
+export async function guestLoginRequest(): Promise<LoginResult> {
+  const r = await fetch(AUTH_API, {
+    method: "POST",
+    headers: { "content-type": "application/json", ...(API_KEY ? { "x-api-key": API_KEY } : {}) },
+    body: JSON.stringify({ action: "guest" }),
+    signal: AbortSignal.timeout(10000),
+  });
+  return r.json();
 }
 
 export function fmtTs(ts?: string | null): string {

@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from "react";
 import { fetchBotTasks, pushBotStatus, fmtTs, type BotStatus } from "../api";
 import { initialTasks, type Task, type TaskStatus } from "../data/demo";
+import { getSession } from "../auth";
 
 let tasks: Task[] = [...initialTasks];
 const listeners = new Set<() => void>();
@@ -64,7 +65,8 @@ export function setTaskStatus(id: number, status: TaskStatus) {
   /* живая задача из бота → шлём статус в Telegram (клиент получит уведомление) */
   const bs = toBotStatus[status];
   if (liveIds.has(id) && bs) {
-    void pushBotStatus(id, bs, "Ибрагимова Юлдуз").catch(() => {});
+    const actor = getSession()?.name || "CRM";
+    void pushBotStatus(id, bs, actor).catch(() => {});
   }
 }
 
