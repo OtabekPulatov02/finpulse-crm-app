@@ -8,11 +8,12 @@ import {
   MenuItem, Modal, Select, Textarea, toast,
 } from "../components/ui";
 import {
-  EMPLOYEE_NAMES, PRIORITIES, STATUSES,
+  PRIORITIES, STATUSES,
   priorityTone, statusTone, type Priority, type Task, type TaskStatus,
 } from "../data/demo";
 import { createTask, deleteTaskEverywhere, editTask, setTaskStatus, useTasks } from "../store/tasks";
 import { hydrateClients, useClients } from "../store/clients";
+import { hydrateEmployees, useEmployees } from "../store/employees";
 
 /* ---------------- Вспомогательное ---------------- */
 
@@ -51,8 +52,10 @@ function TaskFormModal({
   open, onClose, task, defaultStatus,
 }: { open: boolean; onClose: () => void; task?: Task | null; defaultStatus?: TaskStatus }) {
   const clients = useClients();
-  useEffect(() => { void hydrateClients(); }, []);
+  const employees = useEmployees();
+  useEffect(() => { void hydrateClients(); void hydrateEmployees(); }, []);
   const clientOptions = clients.length ? clients.map((c) => c.company) : [task?.client ?? ""].filter(Boolean);
+  const employeeNames = employees.filter((e) => e.active).map((e) => e.name);
 
   const [title, setTitle] = useState(task?.title ?? "");
   const [client, setClient] = useState(task?.client ?? clientOptions[0] ?? "");
@@ -66,7 +69,7 @@ function TaskFormModal({
   const submit = async () => {
     if (!title.trim()) { toast("Укажите название задачи"); return; }
     if (!client) { toast("Выберите клиента"); return; }
-    const assigneeFinal = assignee === "auto" ? EMPLOYEE_NAMES[0] : assignee;
+    const assigneeFinal = assignee === "auto" ? (employeeNames[0] ?? "не назначен") : assignee;
     const clientId = clients.find((c) => c.company === client)?.id ?? null;
     setSaving(true);
     try {
@@ -114,7 +117,7 @@ function TaskFormModal({
           <Field label="Исполнитель">
             <Select value={assignee} onChange={(e) => setAssignee(e.target.value)}>
               {!task && <option value="auto">Назначить автоматически</option>}
-              {EMPLOYEE_NAMES.map((c) => <option key={c}>{c}</option>)}
+              {employeeNames.map((c) => <option key={c}>{c}</option>)}
             </Select>
           </Field>
         </div>
@@ -199,6 +202,8 @@ function TaskViewModal({
 
 export default function Tasks() {
   const tasks = useTasks();
+  const employeesForFilter = useEmployees();
+  useEffect(() => { void hydrateEmployees(); }, []);
   const [view, setView] = useState<"kanban" | "table">("kanban");
 
   const [viewTask, setViewTask] = useState<Task | null>(null);
@@ -343,7 +348,7 @@ export default function Tasks() {
               <option>Любой приоритет</option>{PRIORITIES.map((p) => <option key={p}>{p}</option>)}
             </Select>
             <Select value={fAssignee} onChange={(e) => setFAssignee(e.target.value)} className="!w-auto">
-              <option>Все исполнители</option>{EMPLOYEE_NAMES.map((n) => <option key={n}>{n}</option>)}
+              <option>Все исполнители</option>{employeesForFilter.map((e) => <option key={e.id}>{e.name}</option>)}
             </Select>
           </div>
           <div className="overflow-x-auto">

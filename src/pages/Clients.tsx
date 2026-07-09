@@ -6,7 +6,7 @@ import {
   Avatar, Badge, Card, ConfirmModal, Field, Input, Menu, MenuDivider,
   MenuItem, Modal, Select, Textarea, toast, type Tone,
 } from "../components/ui";
-import { EMPLOYEE_NAMES } from "../data/demo";
+import { useEmployees, hydrateEmployees } from "../store/employees";
 import type { CrmClient } from "../api";
 import { createClient, hydrateClients, patchClient, removeClient, useClients } from "../store/clients";
 
@@ -23,12 +23,15 @@ const TARIFFS = ["Стандарт", "Расширенный", "Премиум"]
 function ClientFormModal({
   open, onClose, client,
 }: { open: boolean; onClose: () => void; client?: CrmClient | null }) {
+  const employees = useEmployees();
+  useEffect(() => { void hydrateEmployees(); }, []);
+  const employeeNames = employees.filter((e) => e.active).map((e) => e.name);
   const edit = !!client;
   const [company, setCompany] = useState(client?.company ?? "");
   const [phone, setPhone] = useState(client?.phone ?? "");
   const [position, setPosition] = useState(client?.position ?? "");
   const [tariff, setTariff] = useState(client?.tariff ?? TARIFFS[0]);
-  const [assignedTo, setAssignedTo] = useState(client?.assignedTo ?? EMPLOYEE_NAMES[0]);
+  const [assignedTo, setAssignedTo] = useState(client?.assignedTo ?? employeeNames[0] ?? "");
   const [note, setNote] = useState(client?.note ?? "");
   const [saving, setSaving] = useState(false);
 
@@ -76,7 +79,10 @@ function ClientFormModal({
             <Select value={tariff} onChange={(e) => setTariff(e.target.value)}>{TARIFFS.map((t) => <option key={t}>{t}</option>)}</Select>
           </Field>
           <Field label="Ответственный бухгалтер">
-            <Select value={assignedTo} onChange={(e) => setAssignedTo(e.target.value)}>{EMPLOYEE_NAMES.map((n) => <option key={n}>{n}</option>)}</Select>
+            <Select value={assignedTo} onChange={(e) => setAssignedTo(e.target.value)}>
+              {!employeeNames.length && <option value="">Нет сотрудников</option>}
+              {employeeNames.map((n) => <option key={n}>{n}</option>)}
+            </Select>
           </Field>
         </div>
         <Field label="Комментарий"><Textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Комментарий" /></Field>

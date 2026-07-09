@@ -7,6 +7,7 @@ import { useEffect } from "react";
 import { Avatar, Menu, MenuDivider, MenuItem, Toaster, toast } from "./ui";
 import { hydrateFromBot, resetTasksStore, useTasks } from "../store/tasks";
 import { hydrateClients, resetClientsStore } from "../store/clients";
+import { resetEmployeesStore } from "../store/employees";
 import { clearSession, ROLE_LABEL, useSession } from "../auth";
 
 const ALL_NAV = [
@@ -39,6 +40,7 @@ export default function Layout() {
     clearSession();
     resetTasksStore();
     resetClientsStore();
+    resetEmployeesStore();
     navigate("/login", { replace: true });
   }
 
