@@ -6,87 +6,111 @@ import {
   Avatar, Badge, Card, ConfirmModal, Field, Input, Menu, MenuDivider,
   MenuItem, Modal, Select, Textarea, toast, type Tone,
 } from "../components/ui";
-import { EMPLOYEE_NAMES, clients, type Client } from "../data/demo";
-import { fetchPending } from "../api";
+import { EMPLOYEE_NAMES } from "../data/demo";
+import type { CrmClient } from "../api";
+import { createClient, hydrateClients, patchClient, removeClient, useClients } from "../store/clients";
 
-const statusTone: Record<string, Tone> = {
-  "Активный": "green", "Новый": "blue", "Из бота": "cyan", "В архиве": "gray",
+const STATUS_LABEL: Record<string, string> = {
+  active: "Активный", pending: "Ожидает активации", archived: "В архиве",
 };
+const statusTone: Record<string, Tone> = {
+  active: "green", pending: "cyan", archived: "gray",
+};
+const STATUSES = ["active", "pending", "archived"];
 
-const TAXES = ["УСН (доходы)", "УСН (доходы − расходы)", "ОСНО", "Патент", "АУСН"];
+const TARIFFS = ["Стандарт", "Расширенный", "Премиум"];
 
-function ClientFormModal({ open, onClose, name }: { open: boolean; onClose: () => void; name?: string }) {
-  const edit = !!name;
+function ClientFormModal({
+  open, onClose, client,
+}: { open: boolean; onClose: () => void; client?: CrmClient | null }) {
+  const edit = !!client;
+  const [company, setCompany] = useState(client?.company ?? "");
+  const [phone, setPhone] = useState(client?.phone ?? "");
+  const [position, setPosition] = useState(client?.position ?? "");
+  const [tariff, setTariff] = useState(client?.tariff ?? TARIFFS[0]);
+  const [assignedTo, setAssignedTo] = useState(client?.assignedTo ?? EMPLOYEE_NAMES[0]);
+  const [note, setNote] = useState(client?.note ?? "");
+  const [saving, setSaving] = useState(false);
+
+  const submit = async () => {
+    if (!edit && !company.trim()) { toast("Укажите название компании"); return; }
+    setSaving(true);
+    try {
+      if (edit && client) {
+        const r = await patchClient(client.id, { position: position || null, tariff: tariff || null, assignedTo: assignedTo || null, note: note || null });
+        if (!r.ok) { toast(r.error || "Не удалось сохранить изменения"); return; }
+        toast("Данные клиента обновлены");
+      } else {
+        const r = await createClient({ company: company.trim(), phone: phone.trim() || undefined, position: position || undefined, tariff, assignedTo, note: note || undefined });
+        if (!r.ok) { toast(r.error === "phone belongs to a different client" ? "Этот телефон уже привязан к другому клиенту" : (r.error || "Не удалось создать клиента")); return; }
+        toast("Клиент создан — карточка добавлена в систему");
+      }
+      onClose();
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <Modal open={open} onClose={onClose} title={edit ? "Изменить клиента" : "Новый клиент"} wide
       footer={
         <>
           <button onClick={onClose} className="rounded-lg border border-slate-200 px-4 py-2 text-[13px] font-medium hover:bg-slate-50">Отмена</button>
-          <button
-            onClick={() => { toast(edit ? "Данные клиента обновлены" : "Клиент создан — карточка добавлена в систему"); onClose(); }}
-            className="flex items-center gap-1.5 rounded-lg bg-brand-600 px-4 py-2 text-[13px] font-medium text-white hover:bg-brand-700">
-            <Plus className="size-4" /> {edit ? "Сохранить" : "Создать клиента"}
+          <button disabled={saving} onClick={submit}
+            className="flex items-center gap-1.5 rounded-lg bg-brand-600 px-4 py-2 text-[13px] font-medium text-white hover:bg-brand-700 disabled:opacity-60">
+            <Plus className="size-4" /> {saving ? "Сохраняем…" : edit ? "Сохранить" : "Создать клиента"}
           </button>
         </>
       }>
       <div className="space-y-4">
         <Field label="Название компании" required>
-          <Input placeholder="ООО «Название»" defaultValue={name} autoFocus />
+          <Input placeholder="ООО «Название»" value={company} onChange={(e) => setCompany(e.target.value)} disabled={edit} autoFocus={!edit} />
         </Field>
+        {edit && <p className="-mt-2 text-xs text-slate-400">Название и телефон компании нельзя изменить из карточки — они привязаны к регистрации в Telegram.</p>}
         <div className="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
-          <Field label="ИНН" required><Input placeholder="7701234567" /></Field>
-          <Field label="Система налогообложения">
-            <Select>{TAXES.map((t) => <option key={t}>{t}</option>)}</Select>
+          <Field label="Телефон"><Input type="tel" placeholder="+998 90 000-00-00" value={phone} onChange={(e) => setPhone(e.target.value)} disabled={edit} /></Field>
+          <Field label="Должность контакта"><Input placeholder="Главный бухгалтер" value={position} onChange={(e) => setPosition(e.target.value)} /></Field>
+        </div>
+        <div className="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
+          <Field label="Тариф">
+            <Select value={tariff} onChange={(e) => setTariff(e.target.value)}>{TARIFFS.map((t) => <option key={t}>{t}</option>)}</Select>
           </Field>
-        </div>
-        <div className="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
-          <Field label="Контактное лицо"><Input placeholder="ФИО" /></Field>
-          <Field label="Телефон"><Input type="tel" placeholder="+998 90 000-00-00" /></Field>
-        </div>
-        <div className="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
-          <Field label="Электронная почта"><Input type="email" placeholder="info@company.uz" /></Field>
           <Field label="Ответственный бухгалтер">
-            <Select>{EMPLOYEE_NAMES.map((n) => <option key={n}>{n}</option>)}</Select>
+            <Select value={assignedTo} onChange={(e) => setAssignedTo(e.target.value)}>{EMPLOYEE_NAMES.map((n) => <option key={n}>{n}</option>)}</Select>
           </Field>
         </div>
-        <Field label="Комментарий"><Textarea placeholder="Комментарий" /></Field>
+        <Field label="Комментарий"><Textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Комментарий" /></Field>
       </div>
     </Modal>
   );
 }
 
 export default function Clients() {
+  const clients = useClients();
+  useEffect(() => { void hydrateClients(); }, []);
+
   const [q, setQ] = useState("");
   const [fStatus, setFStatus] = useState("Все статусы");
   const [createOpen, setCreateOpen] = useState(false);
-  const [editName, setEditName] = useState<string | null>(null);
-  const [archiveName, setArchiveName] = useState<string | null>(null);
-  const [deleteName, setDeleteName] = useState<string | null>(null);
-  const [botClients, setBotClients] = useState<Client[]>([]);
-  useEffect(() => {
-    fetchPending().then((rows) => {
-      const known = new Set(clients.map((c) => c.name.toLowerCase()));
-      setBotClients(rows
-        .filter((r) => r.company && !known.has(r.company.toLowerCase()))
-        .map((r) => ({
-          name: r.company, inn: "—", tax: "—", contact: "клиент из бота",
-          phone: r.phone ?? "—", manager: "не назначен", status: "Из бота" as const, activeTasks: 0,
-        })));
-    }).catch(() => {});
-  }, []);
-  const allClients = [...botClients, ...clients];
+  const [editClient, setEditClient] = useState<CrmClient | null>(null);
+  const [archiveClient, setArchiveClient] = useState<CrmClient | null>(null);
+  const [deleteClient, setDeleteClient] = useState<CrmClient | null>(null);
 
-  const filtered = allClients.filter((c) =>
-    (c.name + c.contact + c.inn).toLowerCase().includes(q.toLowerCase()) &&
+  const filtered = clients.filter((c) =>
+    (c.company + (c.position || "") + (c.phone || "")).toLowerCase().includes(q.toLowerCase()) &&
     (fStatus === "Все статусы" || c.status === fStatus)
   );
+  const pendingCount = clients.filter((c) => c.status === "pending").length;
 
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Клиенты</h1>
-          <p className="mt-0.5 text-sm text-slate-500">48 компаний · 1 из бота ожидает активации</p>
+          <p className="mt-0.5 text-sm text-slate-500">
+            {clients.length} {clients.length === 1 ? "компания" : "компаний"}
+            {pendingCount > 0 && ` · ${pendingCount} ожидает активации`}
+          </p>
         </div>
         <button onClick={() => setCreateOpen(true)}
           className="flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-brand-700">
@@ -98,11 +122,11 @@ export default function Clients() {
         <div className="flex flex-wrap gap-2.5 border-b border-slate-200 p-4">
           <div className="relative min-w-56 max-w-xs flex-1">
             <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
-            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Поиск по названию, ИНН, контакту" className="!pl-9" />
+            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Поиск по названию, телефону, должности" className="!pl-9" />
           </div>
           <Select value={fStatus} onChange={(e) => setFStatus(e.target.value)} className="!w-auto">
             <option>Все статусы</option>
-            {Object.keys(statusTone).map((s) => <option key={s}>{s}</option>)}
+            {STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
           </Select>
         </div>
         <div className="overflow-x-auto">
@@ -110,51 +134,50 @@ export default function Clients() {
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold tracking-wider text-slate-400 uppercase">
                 <th className="px-4 py-3">Компания</th>
-                <th className="px-4 py-3">Контакт</th>
+                <th className="px-4 py-3">Телефон</th>
                 <th className="px-4 py-3">Ответственный</th>
+                <th className="px-4 py-3">Тариф</th>
                 <th className="px-4 py-3">Статус</th>
-                <th className="px-4 py-3">Задачи</th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filtered.map((c) => (
-                <tr key={c.name} className="hover:bg-slate-50">
+                <tr key={c.id} className="hover:bg-slate-50">
                   <td className="px-4 py-3">
-                    <div className="font-semibold">{c.name}</div>
-                    <div className="text-xs text-slate-400">ИНН {c.inn} · {c.tax}</div>
+                    <div className="font-semibold">{c.company}</div>
+                    {c.position && <div className="text-xs text-slate-400">{c.position}</div>}
                   </td>
+                  <td className="px-4 py-3">{c.phone || "—"}</td>
                   <td className="px-4 py-3">
-                    <div>{c.contact}</div>
-                    <div className="text-xs text-slate-400">{c.phone}</div>
-                  </td>
-                  <td className="px-4 py-3">
-                    {c.manager === "не назначен" ? (
+                    {!c.assignedTo ? (
                       <span className="text-slate-400">не назначен</span>
                     ) : (
-                      <span className="flex items-center gap-2"><Avatar name={c.manager} />{c.manager}</span>
+                      <span className="flex items-center gap-2"><Avatar name={c.assignedTo} />{c.assignedTo}</span>
                     )}
                   </td>
-                  <td className="px-4 py-3"><Badge tone={statusTone[c.status]}>{c.status}</Badge></td>
-                  <td className="px-4 py-3 font-semibold">{c.activeTasks}</td>
+                  <td className="px-4 py-3">{c.tariff || "—"}</td>
+                  <td className="px-4 py-3"><Badge tone={statusTone[c.status] ?? "gray"}>{STATUS_LABEL[c.status] ?? c.status}</Badge></td>
                   <td className="px-4 py-3 text-right">
                     <Menu trigger={
                       <button className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
                         <MoreHorizontal className="size-4" />
                       </button>
                     }>
-                      <MenuItem icon={<ExternalLink className="size-4" />} onClick={() => setEditName(c.name)}>Открыть карточку</MenuItem>
-                      {c.status === "Из бота" && (
+                      <MenuItem icon={<ExternalLink className="size-4" />} onClick={() => setEditClient(c)}>Открыть карточку</MenuItem>
+                      {c.status === "pending" && (
                         <MenuItem icon={<CheckCircle2 className="size-4" />}
-                          onClick={() => toast("Клиент активирован — назначьте ответственного бухгалтера")}>
+                          onClick={async () => { const r = await patchClient(c.id, { status: "active" }); toast(r.ok ? "Клиент активирован" : (r.error || "Не удалось активировать")); }}>
                           Активировать
                         </MenuItem>
                       )}
-                      <MenuItem icon={<Pencil className="size-4" />} onClick={() => setEditName(c.name)}>Изменить</MenuItem>
-                      <MenuItem icon={<UserPlus className="size-4" />} onClick={() => toast("Ответственный бухгалтер обновлён")}>Сменить ответственного</MenuItem>
+                      <MenuItem icon={<Pencil className="size-4" />} onClick={() => setEditClient(c)}>Изменить</MenuItem>
+                      <MenuItem icon={<UserPlus className="size-4" />} onClick={() => setEditClient(c)}>Сменить ответственного</MenuItem>
                       <MenuDivider />
-                      <MenuItem icon={<Archive className="size-4" />} onClick={() => setArchiveName(c.name)}>Архивировать</MenuItem>
-                      <MenuItem danger icon={<Trash2 className="size-4" />} onClick={() => setDeleteName(c.name)}>Удалить</MenuItem>
+                      {c.status !== "archived" && (
+                        <MenuItem icon={<Archive className="size-4" />} onClick={() => setArchiveClient(c)}>Архивировать</MenuItem>
+                      )}
+                      <MenuItem danger icon={<Trash2 className="size-4" />} onClick={() => setDeleteClient(c)}>Удалить</MenuItem>
                     </Menu>
                   </td>
                 </tr>
@@ -168,22 +191,30 @@ export default function Clients() {
       </Card>
 
       <ClientFormModal open={createOpen} onClose={() => setCreateOpen(false)} />
-      {editName && <ClientFormModal open onClose={() => setEditName(null)} name={editName} />}
+      {editClient && <ClientFormModal open onClose={() => setEditClient(null)} client={editClient} />}
       <ConfirmModal
-        open={!!archiveName}
-        onClose={() => setArchiveName(null)}
-        onConfirm={() => toast("Клиент архивирован — карточка перемещена в архив")}
+        open={!!archiveClient}
+        onClose={() => setArchiveClient(null)}
+        onConfirm={async () => {
+          if (!archiveClient) return;
+          const r = await patchClient(archiveClient.id, { status: "archived" });
+          toast(r.ok ? "Клиент архивирован — карточка перемещена в архив" : (r.error || "Не удалось архивировать"));
+        }}
         title="Архивировать клиента?"
         text="Клиент будет перемещён в архив. Активные задачи останутся доступны, новые задачи создавать будет нельзя."
         confirmLabel="Архивировать" tone="warning"
         icon={<Archive className="size-5" />}
       />
       <ConfirmModal
-        open={!!deleteName}
-        onClose={() => setDeleteName(null)}
-        onConfirm={() => toast("Клиент удалён из системы")}
+        open={!!deleteClient}
+        onClose={() => setDeleteClient(null)}
+        onConfirm={async () => {
+          if (!deleteClient) return;
+          const r = await removeClient(deleteClient.id);
+          toast(r.ok ? "Клиент удалён из системы" : (r.error === "forbidden" ? "Удаление доступно только супер-админу" : (r.error || "Не удалось удалить клиента")));
+        }}
         title="Удалить клиента?"
-        text="Это действие нельзя отменить. Все связанные задачи, комментарии и файлы будут также удалены."
+        text="Это действие нельзя отменить. Карточка клиента будет удалена безвозвратно. Доступно только супер-админу."
         icon={<Trash2 className="size-5" />}
       />
     </div>

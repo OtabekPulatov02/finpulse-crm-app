@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Calendar, Check, ExternalLink, Hash, Kanban, LayoutList, MoreHorizontal,
   Pencil, Plus, RotateCcw, Search, Send, Trash2, X,
@@ -8,10 +8,11 @@ import {
   MenuItem, Modal, Select, Textarea, toast,
 } from "../components/ui";
 import {
-  CLIENT_NAMES, EMPLOYEE_NAMES, PRIORITIES, STATUSES,
+  EMPLOYEE_NAMES, PRIORITIES, STATUSES,
   priorityTone, statusTone, type Priority, type Task, type TaskStatus,
 } from "../data/demo";
-import { addTask, removeTask, setTaskStatus, updateTask, useTasks } from "../store/tasks";
+import { createTask, deleteTaskEverywhere, editTask, setTaskStatus, useTasks } from "../store/tasks";
+import { hydrateClients, useClients } from "../store/clients";
 
 /* ---------------- Вспомогательное ---------------- */
 
@@ -48,25 +49,43 @@ function sourceLabel(t: Task) {
 function TaskFormModal({
   open, onClose, task, defaultStatus,
 }: { open: boolean; onClose: () => void; task?: Task | null; defaultStatus?: TaskStatus }) {
+  const clients = useClients();
+  useEffect(() => { void hydrateClients(); }, []);
+  const clientOptions = clients.length ? clients.map((c) => c.company) : [task?.client ?? ""].filter(Boolean);
+
   const [title, setTitle] = useState(task?.title ?? "");
-  const [client, setClient] = useState(task?.client ?? CLIENT_NAMES[1]);
+  const [client, setClient] = useState(task?.client ?? clientOptions[0] ?? "");
   const [assignee, setAssignee] = useState(task?.assignee ?? "auto");
   const [status, setStatus] = useState<TaskStatus>(task?.status ?? defaultStatus ?? "Новая");
   const [priority, setPriority] = useState<Priority>(task?.priority ?? "Средний");
-  const [due, setDue] = useState(task?.due ?? "20.07");
+  const [dueDate, setDueDate] = useState(task?.dueDate ?? "");
   const [description, setDescription] = useState(task?.description ?? "");
+  const [saving, setSaving] = useState(false);
 
-  const submit = () => {
+  const submit = async () => {
     if (!title.trim()) { toast("Укажите название задачи"); return; }
+    if (!client) { toast("Выберите клиента"); return; }
     const assigneeFinal = assignee === "auto" ? EMPLOYEE_NAMES[0] : assignee;
-    if (task) {
-      updateTask(task.id, { title, client, assignee: assigneeFinal, status, priority, due, description });
-      toast("Изменения сохранены — история задачи дополнена");
-    } else {
-      addTask({ title, client, assignee: assigneeFinal, status, priority, due, description, created: "сегодня" });
-      toast(assignee === "auto" ? "Задача создана и распределена автоматически" : "Задача создана и назначена исполнителю");
+    const clientId = clients.find((c) => c.company === client)?.id ?? null;
+    setSaving(true);
+    try {
+      if (task) {
+        const r = await editTask(task.id, {
+          title, client, assignee: assigneeFinal, dueDate: dueDate || null, description, status,
+        });
+        if (!r.ok) { toast(r.error || "Не удалось сохранить изменения"); return; }
+        toast("Изменения сохранены — история задачи дополнена");
+      } else {
+        const r = await createTask({
+          title, client, clientId, assignee: assigneeFinal, priority, dueDate: dueDate || null, description,
+        });
+        if (!r.ok) { toast(r.error || "Не удалось создать задачу"); return; }
+        toast(assignee === "auto" ? "Задача создана и распределена автоматически" : "Задача создана и назначена исполнителю");
+      }
+      onClose();
+    } finally {
+      setSaving(false);
     }
-    onClose();
   };
 
   return (
@@ -74,9 +93,9 @@ function TaskFormModal({
       footer={
         <>
           <button onClick={onClose} className="rounded-lg border border-slate-200 px-4 py-2 text-[13px] font-medium hover:bg-slate-50">Отмена</button>
-          <button onClick={submit} className="flex items-center gap-1.5 rounded-lg bg-brand-600 px-4 py-2 text-[13px] font-medium text-white hover:bg-brand-700">
+          <button disabled={saving} onClick={submit} className="flex items-center gap-1.5 rounded-lg bg-brand-600 px-4 py-2 text-[13px] font-medium text-white hover:bg-brand-700 disabled:opacity-60">
             {task ? <Check className="size-4" /> : <Plus className="size-4" />}
-            {task ? "Сохранить" : "Создать задачу"}
+            {saving ? "Сохраняем…" : task ? "Сохранить" : "Создать задачу"}
           </button>
         </>
       }>
@@ -87,7 +106,8 @@ function TaskFormModal({
         <div className="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
           <Field label="Клиент" required>
             <Select value={client} onChange={(e) => setClient(e.target.value)}>
-              {CLIENT_NAMES.map((c) => <option key={c}>{c}</option>)}
+              {!clientOptions.length && <option value="">Нет клиентов</option>}
+              {clientOptions.map((c) => <option key={c}>{c}</option>)}
             </Select>
           </Field>
           <Field label="Исполнитель">
@@ -108,8 +128,8 @@ function TaskFormModal({
               {PRIORITIES.map((p) => <option key={p}>{p}</option>)}
             </Select>
           </Field>
-          <Field label="Дедлайн">
-            <Input value={due} onChange={(e) => setDue(e.target.value)} placeholder="ДД.ММ" />
+          <Field label="Срок">
+            <Input type="date" value={dueDate ?? ""} onChange={(e) => setDueDate(e.target.value)} />
           </Field>
         </div>
         <Field label="Описание">
@@ -410,7 +430,11 @@ export default function Tasks() {
       <ConfirmModal
         open={!!deleteTaskT}
         onClose={() => setDeleteTaskT(null)}
-        onConfirm={() => { if (deleteTaskT) { removeTask(deleteTaskT.id); toast("Задача удалена из системы"); } }}
+        onConfirm={async () => {
+          if (!deleteTaskT) return;
+          const r = await deleteTaskEverywhere(deleteTaskT.id);
+          toast(r.ok ? "Задача удалена из системы" : (r.error === "forbidden" ? "Удаление доступно только супер-админу" : (r.error || "Не удалось удалить задачу")));
+        }}
         title="Удалить задачу?"
         text="Это действие нельзя отменить. Все связанные комментарии и файлы будут также удалены."
         icon={<Trash2 className="size-5" />}
