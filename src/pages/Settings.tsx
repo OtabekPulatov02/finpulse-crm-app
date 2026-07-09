@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { BookOpen, Bell, GitBranch, Pencil, Plus, ScrollText, Shield, Tags, UserPlus, Users } from "lucide-react";
 import { Avatar, Badge, Card, CardHeader, Toggle, toast, type Tone } from "../components/ui";
-import { fetchLogs, fmtTs, type LogRow } from "../api";
+import { fetchLogs } from "../api";
+import { mapLog, type LogView } from "../lib/logs";
+import { hydrateEmployees, useEmployees } from "../store/employees";
+import { EDITABLE_STATUSES, PRIORITIES, priorityTone, statusTone } from "../data/demo";
 
 const tabs = [
   { id: "users", label: "Пользователи", icon: Users },
@@ -13,23 +17,6 @@ const tabs = [
   { id: "logs", label: "Логи системы", icon: ScrollText },
 ] as const;
 type TabId = (typeof tabs)[number]["id"];
-
-const users = [
-  { name: "Ибрагимова Юлдуз Ахмедовна", email: "y.ibragimova@finpulse.uz", role: "Супер-админ", tone: "purple" as Tone, last: "сегодня, 11:41" },
-  { name: "Крылова Елена", email: "e.krylova@finpulse.uz", role: "Бухгалтер", tone: "blue" as Tone, last: "сегодня, 09:02" },
-  { name: "Орлов Дмитрий", email: "d.orlov@finpulse.uz", role: "Бухгалтер", tone: "blue" as Tone, last: "сегодня, 08:47" },
-  { name: "Никитина Ольга", email: "o.nikitina@finpulse.uz", role: "Руководитель", tone: "cyan" as Tone, last: "сегодня, 10:30" },
-];
-
-const logs = [
-  { time: "сегодня, 14:02:11", src: "tg", event: "Задача создана", who: "Павел Л. @p_litvinov", assignee: "—", details: "№ 1247 «Требование ГНИ по НДС…» · ООО «ТехноСфера» · 📎 1" },
-  { time: "сегодня, 14:02:12", src: "tg", event: "Назначен исполнитель", who: "Елена Крылова", assignee: "Елена Крылова", details: "№ 1247" },
-  { time: "сегодня, 13:45:02", src: "crm", event: "Вход в систему", who: "Ибрагимова Юлдуз", assignee: "—", details: "супер-админ" },
-  { time: "сегодня, 13:20:44", src: "crm", event: "Изменён статус задачи", who: "Дмитрий Орлов", assignee: "Дмитрий Орлов", details: "№ 1244 «В работе» → «Выполнена»" },
-  { time: "сегодня, 12:47:18", src: "tg", event: "Новая компания", who: "Шахзод К. @b_trans", assignee: "—", details: "MCHJ «Барака Транс» · телефон подтверждён" },
-  { time: "сегодня, 11:05:37", src: "crm", event: "Экспорт отчёта", who: "Ольга Никитина", assignee: "—", details: "Аналитика, июль" },
-  { time: "вчера, 18:12:50", src: "tg", event: "Ответ клиенту", who: "Елена Крылова", assignee: "Елена Крылова", details: "№ 1238" },
-];
 
 function DictCard({ title, items, placeholder }: { title: string; items: { label: string; badge?: Tone; note?: string }[]; placeholder: string }) {
   return (
@@ -55,54 +42,29 @@ function DictCard({ title, items, placeholder }: { title: string; items: { label
 }
 
 
-const EVENT_LABEL: Record<string, string> = {
-  task_created: "Задача создана",
-  task_assigned: "Назначен исполнитель",
-  task_done: "Задача выполнена",
-  task_reused: "Задача создана повторно",
-  new_company: "Новая компания",
-  status_changed: "Изменён статус задачи",
-  group_send_failed: "Ошибка отправки в группу",
-};
-const ST_RU: Record<string, string> = { new: "Новая", in_progress: "В работе", done: "Выполнена" };
-
-interface LogView { ts?: string; time: string; src: "tg" | "crm"; event: string; who: string; assignee: string; details: string }
-
-function mapLog(l: LogRow, src: "tg" | "crm"): LogView {
-  const isStatus = l.event === "status_changed";
-  const parts = [
-    l.num ? `№ ${l.num}` : null,
-    isStatus && l.from && l.to ? `«${ST_RU[String(l.from)] ?? l.from}» → «${ST_RU[String(l.to)] ?? l.to}»` : null,
-    l.company ? String(l.company) : null,
-    l.text ? `«${String(l.text).slice(0, 60)}${String(l.text).length > 60 ? "…" : ""}»` : null,
-    typeof l.files === "number" && l.files ? `📎 ${l.files}` : null,
-  ].filter(Boolean);
-  return {
-    ts: l.ts,
-    time: fmtTs(l.ts),
-    src,
-    event: EVENT_LABEL[l.event] ?? l.event,
-    who: String((isStatus ? l.by : l.from) ?? l.by ?? "—"),
-    assignee: l.assignee ? String(l.assignee) : "—",
-    details: parts.join(" · "),
-  };
-}
+const ROLE_LABEL: Record<string, string> = { admin: "Администратор", accountant: "Бухгалтер" };
+const ROLE_TONE: Record<string, Tone> = { admin: "purple", accountant: "blue" };
 
 export default function Settings() {
   const [tab, setTab] = useState<TabId>("users");
   const [logFilter, setLogFilter] = useState<"all" | "tg" | "crm">("all");
   const [live, setLive] = useState<LogView[] | null>(null);
+  const [logsLoading, setLogsLoading] = useState(false);
+  const employees = useEmployees();
+  useEffect(() => { void hydrateEmployees(); }, []);
   useEffect(() => {
     if (tab !== "logs" || live) return;
+    setLogsLoading(true);
     Promise.all([fetchLogs("telegram"), fetchLogs("crm")])
       .then(([tg, crm]) => {
         const rows = [...tg.map((l) => mapLog(l, "tg")), ...crm.map((l) => mapLog(l, "crm"))]
           .sort((a, b) => ((a.ts ?? "") < (b.ts ?? "") ? 1 : -1));
-        if (rows.length) setLive(rows);
+        setLive(rows);
       })
-      .catch(() => {});
+      .catch(() => setLive([]))
+      .finally(() => setLogsLoading(false));
   }, [tab, live]);
-  const allLogs: LogView[] = live ?? (logs as LogView[]);
+  const allLogs: LogView[] = live ?? [];
   const shownLogs = allLogs.filter((l) => logFilter === "all" || l.src === logFilter);
 
   return (
@@ -124,35 +86,40 @@ export default function Settings() {
       {tab === "users" && (
         <Card>
           <div className="flex items-center justify-between border-b border-slate-200 p-4">
-            <span className="text-sm font-semibold">{users.length} пользователя</span>
-            <button className="flex items-center gap-2 rounded-lg bg-brand-600 px-3.5 py-2 text-[13px] font-medium text-white hover:bg-brand-700"><UserPlus className="size-4" />Добавить</button>
+            <span className="text-sm font-semibold">{employees.length} {employees.length === 1 ? "сотрудник" : "сотрудника"}</span>
+            <Link to="/employees" className="flex items-center gap-2 rounded-lg bg-brand-600 px-3.5 py-2 text-[13px] font-medium text-white hover:bg-brand-700"><UserPlus className="size-4" />Управлять в разделе «Сотрудники»</Link>
           </div>
-          <table className="w-full text-[13.5px]">
-            <thead>
-              <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold tracking-wider text-slate-400 uppercase">
-                <th className="px-5 py-3">Пользователь</th><th className="px-4 py-3">Почта</th><th className="px-4 py-3">Роль</th><th className="px-4 py-3">Последний вход</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {users.map((u) => (
-                <tr key={u.email} className="hover:bg-slate-50">
-                  <td className="px-5 py-3"><span className="flex items-center gap-2.5 font-medium"><Avatar name={u.name} />{u.name}</span></td>
-                  <td className="px-4 py-3 text-slate-500">{u.email}</td>
-                  <td className="px-4 py-3"><Badge tone={u.tone}>{u.role}</Badge></td>
-                  <td className="px-4 py-3 text-slate-500">{u.last}</td>
+          {employees.length ? (
+            <table className="w-full text-[13.5px]">
+              <thead>
+                <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold tracking-wider text-slate-400 uppercase">
+                  <th className="px-5 py-3">Сотрудник</th><th className="px-4 py-3">Телефон (логин)</th><th className="px-4 py-3">Роль</th><th className="px-4 py-3">Статус</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {employees.map((e) => (
+                  <tr key={e.id} className="hover:bg-slate-50">
+                    <td className="px-5 py-3"><span className="flex items-center gap-2.5 font-medium"><Avatar name={e.name} />{e.name}</span></td>
+                    <td className="px-4 py-3 text-slate-500">{e.phone ?? "—"}</td>
+                    <td className="px-4 py-3"><Badge tone={ROLE_TONE[e.role] ?? "gray"}>{ROLE_LABEL[e.role] ?? e.role}</Badge></td>
+                    <td className="px-4 py-3">{e.active ? <Badge tone="green">Активен</Badge> : <Badge tone="gray">Отключён</Badge>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <p className="px-5 py-8 text-center text-sm text-slate-400">Сотрудники ещё не добавлены — создайте первого в разделе «Сотрудники».</p>
+          )}
         </Card>
       )}
 
       {tab === "roles" && (
-        <div className="grid grid-cols-3 gap-4 max-xl:grid-cols-1">
+        <div className="grid grid-cols-4 gap-4 max-xl:grid-cols-2 max-sm:grid-cols-1">
           {[
-            { name: "Супер-админ", desc: "Полный доступ: настройки, роли, справочники, логи, все данные клиентов.", tone: "purple" as Tone },
-            { name: "Руководитель", desc: "Задачи и клиенты всей команды, переназначение, аналитика.", tone: "cyan" as Tone },
-            { name: "Бухгалтер", desc: "Свои клиенты и задачи. Личные данные клиентов скрыты.", tone: "blue" as Tone },
+            { name: "Администратор", desc: "Полный доступ: сотрудники, все клиенты и задачи, настройки, логи.", tone: "purple" as Tone },
+            { name: "Бухгалтер", desc: "Свои клиенты и задачи, назначенные в CRM.", tone: "blue" as Tone },
+            { name: "Клиент", desc: "Доступ только к своим задачам через бота/личный кабинет.", tone: "cyan" as Tone },
+            { name: "Гость", desc: "Демонстрационный доступ без реальных данных.", tone: "gray" as Tone },
           ].map((r) => (
             <Card key={r.name} className="p-5">
               <Badge tone={r.tone}>{r.name}</Badge>
@@ -165,13 +132,12 @@ export default function Settings() {
       {tab === "statuses" && (
         <div className="grid grid-cols-2 gap-4 max-lg:grid-cols-1">
           <DictCard title="Статусы задач" placeholder="Новый статус" items={[
-            { label: "Новая", badge: "purple" }, { label: "В работе", badge: "blue" },
-            { label: "Выполнена", badge: "green" }, { label: "Отменена", badge: "gray" },
+            ...EDITABLE_STATUSES.map((s) => ({ label: s, badge: statusTone[s] })),
+            { label: "Архив", badge: "gray" as Tone, note: "авто, через 24ч после выполнения" },
           ]} />
-          <DictCard title="Приоритеты" placeholder="Новый приоритет" items={[
-            { label: "Низкий", badge: "gray" }, { label: "Средний", badge: "blue" },
-            { label: "Высокий", badge: "yellow" }, { label: "Критический", badge: "red" },
-          ]} />
+          <DictCard title="Приоритеты" placeholder="Новый приоритет" items={
+            PRIORITIES.map((p) => ({ label: p, badge: priorityTone[p] }))
+          } />
         </div>
       )}
 
@@ -247,32 +213,38 @@ export default function Settings() {
               </button>
             ))}
             <span className="ml-auto flex items-center gap-1.5 text-xs text-slate-400">
-              {live && <span className="size-1.5 animate-pulse rounded-full bg-emerald-500" />}
-              {live ? "живые данные из бота · хранятся последние 500" : "загрузка… показаны демо-записи"}
+              {allLogs.length > 0 && <span className="size-1.5 animate-pulse rounded-full bg-emerald-500" />}
+              {logsLoading ? "загрузка…" : allLogs.length ? "живые данные · хранятся последние 500" : "записей пока нет"}
             </span>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-[13px]">
-              <thead>
-                <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold tracking-wider text-slate-400 uppercase">
-                  <th className="px-4 py-3">Время</th><th className="px-4 py-3">Источник</th><th className="px-4 py-3">Событие</th>
-                  <th className="px-4 py-3">Кто</th><th className="px-4 py-3">Исполнитель</th><th className="px-4 py-3">Детали</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {shownLogs.map((l, i) => (
-                  <tr key={i} className="hover:bg-slate-50">
-                    <td className="px-4 py-2.5 whitespace-nowrap text-slate-400">{l.time}</td>
-                    <td className="px-4 py-2.5"><Badge tone={l.src === "tg" ? "cyan" : "purple"}>{l.src === "tg" ? "Telegram" : "CRM"}</Badge></td>
-                    <td className="px-4 py-2.5 font-medium whitespace-nowrap">{l.event}</td>
-                    <td className="px-4 py-2.5 whitespace-nowrap">{l.who}</td>
-                    <td className="px-4 py-2.5 whitespace-nowrap">{l.assignee}</td>
-                    <td className="px-4 py-2.5 text-slate-500">{l.details}</td>
+          {shownLogs.length ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-[13px]">
+                <thead>
+                  <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold tracking-wider text-slate-400 uppercase">
+                    <th className="px-4 py-3">Время</th><th className="px-4 py-3">Источник</th><th className="px-4 py-3">Событие</th>
+                    <th className="px-4 py-3">Кто</th><th className="px-4 py-3">Исполнитель</th><th className="px-4 py-3">Детали</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {shownLogs.map((l, i) => (
+                    <tr key={i} className="hover:bg-slate-50">
+                      <td className="px-4 py-2.5 whitespace-nowrap text-slate-400">{l.time}</td>
+                      <td className="px-4 py-2.5"><Badge tone={l.src === "tg" ? "cyan" : "purple"}>{l.src === "tg" ? "Telegram" : "CRM"}</Badge></td>
+                      <td className="px-4 py-2.5 font-medium whitespace-nowrap">{l.event}</td>
+                      <td className="px-4 py-2.5 whitespace-nowrap">{l.who}</td>
+                      <td className="px-4 py-2.5 whitespace-nowrap">{l.assignee}</td>
+                      <td className="px-4 py-2.5 text-slate-500">{l.details}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="px-5 py-8 text-center text-sm text-slate-400">
+              {logsLoading ? "Загружаем журнал…" : "Событий пока нет — они появятся здесь по мере работы с ботом и CRM."}
+            </p>
+          )}
         </Card>
       )}
     </div>
