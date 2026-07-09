@@ -1,13 +1,17 @@
 import type { Tone } from "../components/ui";
 
-export type TaskStatus = "Новая" | "В работе" | "Выполнена" | "Отменена";
+export type TaskStatus = "Новая" | "В работе" | "Выполнена" | "Архив";
+/* Статусы, которые можно выбрать вручную при создании/редактировании —
+   "Архив" не входит: задача попадает туда автоматически через 24ч после
+   выполнения (см. displayStatus в store/tasks.ts), назначить его напрямую нельзя. */
+export const EDITABLE_STATUSES: TaskStatus[] = ["Новая", "В работе", "Выполнена"];
 export type Priority = "Низкий" | "Средний" | "Высокий" | "Критический";
 
-export const STATUSES: TaskStatus[] = ["Новая", "В работе", "Выполнена", "Отменена"];
+export const STATUSES: TaskStatus[] = ["Новая", "В работе", "Выполнена", "Архив"];
 export const PRIORITIES: Priority[] = ["Низкий", "Средний", "Высокий", "Критический"];
 
 export const statusTone: Record<TaskStatus, Tone> = {
-  "Новая": "purple", "В работе": "blue", "Выполнена": "green", "Отменена": "gray",
+  "Новая": "purple", "В работе": "blue", "Выполнена": "green", "Архив": "gray",
 };
 export const priorityTone: Record<Priority, Tone> = {
   "Низкий": "gray", "Средний": "blue", "Высокий": "yellow", "Критический": "red",
@@ -23,6 +27,7 @@ export interface Task {
   priority: Priority;
   due: string;
   dueDate?: string | null;
+  doneAt?: string | null;
   source?: "bot" | "crm";
   fromBot?: boolean;
   fromCalendar?: boolean;
@@ -46,7 +51,7 @@ export const initialTasks: Task[] = [
   { id: 1242, title: "Выставить счета за услуги июня", client: "ИП Соколова А. В.", assignee: "Дмитрий Орлов", status: "Выполнена", priority: "Средний", due: "05.07", created: "28.06.2026, 15:31" },
   { id: 1239, title: "Продлить ЭЦП директора (истекает 20.07)", client: "OOO «Samarqand Logistics»", assignee: "Игорь Васильев", status: "Выполнена", priority: "Средний", due: "06.07", created: "27.06.2026, 10:12" },
   { id: 1237, title: "Инвентаризация основных средств за полугодие", client: "ООО «СтройГарант»", assignee: "Ольга Никитина", status: "Выполнена", priority: "Низкий", due: "30.06", created: "20.06.2026, 09:00" },
-  { id: 1218, title: "Переход на электронный документооборот (Didox)", client: "ИП Соколова А. В.", assignee: "Дмитрий Орлов", status: "Отменена", priority: "Низкий", due: "—", created: "10.06.2026, 12:00", description: "Клиент решил остаться на бумажном документообороте до конца года." },
+  { id: 1218, title: "Переход на электронный документооборот (Didox)", client: "ИП Соколова А. В.", assignee: "Дмитрий Орлов", status: "Архив", priority: "Низкий", due: "—", created: "10.06.2026, 12:00", description: "Клиент решил остаться на бумажном документообороте до конца года." },
 ];
 
 export interface Client {

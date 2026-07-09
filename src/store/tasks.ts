@@ -71,6 +71,7 @@ export async function hydrateFromBot() {
       priority: "Средний",
       due: isoToDisplayDue(b.dueDate),
       dueDate: b.dueDate ?? null,
+      doneAt: b.doneAt ?? null,
       fromBot: true,
       source: b.source === "crm" ? "crm" as const : "bot" as const,
       created: fmtTs(b.createdAt),
@@ -86,7 +87,10 @@ export async function hydrateFromBot() {
 export function setTaskStatus(id: number, status: TaskStatus) {
   const t = tasks.find((t) => t.id === id);
   if (!t || t.status === status) return;
+  const prevStatus = t.status;
   t.status = status;
+  if (status === "Выполнена") t.doneAt = new Date().toISOString();
+  else if (prevStatus === "Выполнена") t.doneAt = null; // вернули в работу — снимаем метку для авто-архива
   emit();
   /* живая задача → шлём статус на бэкенд (клиент получит уведомление в Telegram) */
   const bs = toBotStatus[status];
@@ -94,6 +98,19 @@ export function setTaskStatus(id: number, status: TaskStatus) {
     const actor = getSession()?.name || "CRM";
     void pushBotStatus(id, bs, actor).catch(() => {});
   }
+}
+
+/* Через 24ч после выполнения задача "уходит в архив" — это не отдельный
+   статус на бэкенде (там только new/in_progress/done), а чисто
+   отображаемый бакет, вычисляемый по doneAt. Ручного статуса "Архив"
+   не существует — см. EDITABLE_STATUSES в data/demo.ts. */
+const ARCHIVE_AFTER_MS = 24 * 60 * 60 * 1000;
+export function displayStatus(t: Task): TaskStatus {
+  if (t.status === "Выполнена" && t.doneAt) {
+    const doneTime = new Date(t.doneAt).getTime();
+    if (!Number.isNaN(doneTime) && Date.now() - doneTime > ARCHIVE_AFTER_MS) return "Архив";
+  }
+  return t.status;
 }
 
 /* Локальное обновление (для демо-задач, не связанных с бэкендом) */
@@ -131,6 +148,7 @@ export async function createTask(data: {
     priority: data.priority,
     due: isoToDisplayDue(b.dueDate),
     dueDate: b.dueDate ?? null,
+    doneAt: null,
     fromBot: true,
     source: "crm" as const,
     created: "сегодня",

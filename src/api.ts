@@ -30,6 +30,7 @@ export interface BotTask {
   files: number;
   dueDate?: string | null;
   source?: "bot" | "crm";
+  doneAt?: string | null;
 }
 
 export interface CrmClient {

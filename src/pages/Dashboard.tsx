@@ -55,9 +55,9 @@ function Donut() {
 
 export default function Dashboard() {
   const tasks = useTasks();
-  const today = tasks.filter((t) => t.status !== "Выполнена" && t.status !== "Отменена").slice(0, 5);
+  const today = tasks.filter((t) => t.status !== "Выполнена" && t.status !== "Архив").slice(0, 5);
   const liveReqs = tasks
-    .filter((t) => t.fromBot && isLiveTask(t.id) && t.status !== "Отменена")
+    .filter((t) => t.fromBot && isLiveTask(t.id) && t.status !== "Архив")
     .slice(0, 3)
     .map((t) => ({ from: t.client, time: t.created ?? "", msg: t.description ?? t.title, live: true }));
   const requests = liveReqs.length ? liveReqs : tgRequests.map((r) => ({ ...r, live: false }));
