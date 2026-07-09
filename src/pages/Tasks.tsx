@@ -39,6 +39,7 @@ function isOverdue(t: Task): boolean {
 }
 
 function sourceLabel(t: Task) {
+  if (t.source === "crm") return "из CRM";
   if (t.fromBot) return "из Telegram";
   if (t.fromCalendar) return "из календаря";
   return null;
@@ -184,7 +185,7 @@ function TaskViewModal({
         <dt className="text-slate-400">Исполнитель</dt>
         <dd className="flex items-center gap-2"><Avatar name={task.assignee} className="!size-6 !text-[10px]" />{task.assignee}</dd>
         <dt className="text-slate-400">Постановщик</dt>
-        <dd>{task.fromBot ? "Автораспределение (Telegram)" : "Ибрагимова Юлдуз"}</dd>
+        <dd>{task.source === "crm" ? "Создана в CRM" : task.fromBot ? "Автораспределение (Telegram)" : "Ибрагимова Юлдуз"}</dd>
         <dt className="text-slate-400">Создана</dt>
         <dd>{task.created ?? "—"}</dd>
         <dt className="text-slate-400">Дедлайн</dt>
