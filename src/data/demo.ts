@@ -23,6 +23,7 @@ export interface Task {
   priority: Priority;
   due: string;
   dueDate?: string | null;
+  source?: "bot" | "crm";
   fromBot?: boolean;
   fromCalendar?: boolean;
   description?: string;

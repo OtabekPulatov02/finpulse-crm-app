@@ -72,6 +72,7 @@ export async function hydrateFromBot() {
       due: isoToDisplayDue(b.dueDate),
       dueDate: b.dueDate ?? null,
       fromBot: true,
+      source: "bot" as const,
       created: fmtTs(b.createdAt),
     }));
     live.forEach((t) => liveIds.add(t.id));
@@ -131,6 +132,7 @@ export async function createTask(data: {
     due: isoToDisplayDue(b.dueDate),
     dueDate: b.dueDate ?? null,
     fromBot: true,
+    source: "crm" as const,
     created: "сегодня",
   };
   liveIds.add(t.id);
