@@ -15,6 +15,8 @@ import {
 import { createTask, deleteTaskEverywhere, displayStatus, editTask, isOverdue, setTaskStatus, useTasks } from "../store/tasks";
 import { hydrateClients, useClients } from "../store/clients";
 import { hydrateEmployees, useEmployees } from "../store/employees";
+import { fetchLogs } from "../api";
+import { mapLog, type LogView } from "../lib/logs";
 
 /* ---------------- Вспомогательное ---------------- */
 
@@ -139,6 +141,45 @@ function TaskFormModal({
 
 /* ---------------- Быстрый просмотр задачи ---------------- */
 
+function TaskHistory({ taskId }: { taskId: number }) {
+  const [history, setHistory] = useState<LogView[] | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    setHistory(null);
+    Promise.all([fetchLogs("telegram"), fetchLogs("crm")])
+      .then(([tg, crm]) => {
+        if (cancelled) return;
+        const rows = [
+          ...tg.filter((l) => l.num === taskId).map((l) => mapLog(l, "tg")),
+          ...crm.filter((l) => l.num === taskId).map((l) => mapLog(l, "crm")),
+        ].sort((a, b) => ((a.ts ?? "") < (b.ts ?? "") ? 1 : -1));
+        setHistory(rows);
+      })
+      .catch(() => setHistory([]));
+    return () => { cancelled = true; };
+  }, [taskId]);
+
+  if (history === null) {
+    return <p className="py-3 text-center text-xs text-slate-400">Загружаем историю…</p>;
+  }
+  if (!history.length) {
+    return <p className="py-3 text-center text-xs text-slate-400">По этой задаче пока нет записей в журнале.</p>;
+  }
+  return (
+    <ul className="space-y-3 py-1">
+      {history.map((l, i) => (
+        <li key={i} className="flex items-start gap-2.5 text-[12.5px]">
+          <Badge tone={l.src === "tg" ? "cyan" : "purple"}>{l.src === "tg" ? "Telegram" : "CRM"}</Badge>
+          <div className="min-w-0 flex-1">
+            <div className="font-medium">{l.event}{l.who !== "—" && <> · {l.who}</>}</div>
+            <div className="mt-0.5 text-[11px] text-slate-400">{l.time}</div>
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function TaskViewModal({
   task, onClose, onEdit, onDelete,
 }: { task: Task | null; onClose: () => void; onEdit: (t: Task) => void; onDelete: (t: Task) => void }) {
@@ -187,6 +228,10 @@ function TaskViewModal({
         <dt className="text-slate-400">Дедлайн</dt>
         <dd className={`font-semibold ${isOverdue(task) ? "text-red-600" : ""}`}>{task.due}</dd>
       </dl>
+      <div className="mt-4 border-t border-slate-100 pt-4">
+        <div className="mb-1.5 text-[11px] font-semibold tracking-wider text-slate-400 uppercase">История</div>
+        <TaskHistory taskId={task.id} />
+      </div>
     </Modal>
   );
 }
