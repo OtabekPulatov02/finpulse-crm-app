@@ -1,34 +1,22 @@
-import { useMemo, useState } from "react";
-import { AlarmClockPlus, ChevronLeft, ChevronRight, CreditCard, ListPlus, ListTodo, Plus, Receipt, Send } from "lucide-react";
-import { Badge, Card, CardHeader, Modal, toast } from "../components/ui";
+import { useEffect, useMemo, useState } from "react";
+import { AlarmClockPlus, ChevronLeft, ChevronRight, CreditCard, ExternalLink, ListTodo, Plus, Receipt, Send, Trash2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Badge, Card, CardHeader, ConfirmModal, Modal, toast } from "../components/ui";
+import { useTasks } from "../store/tasks";
+import { hydrateClients, useClients } from "../store/clients";
+import { createCalendarEvent, hydrateCalendarEvents, removeCalendarEvent, useCalendarEvents } from "../store/calendarEvents";
+import type { CalendarEventEntry } from "../api";
 
 type EvType = "tax" | "pay" | "task";
-interface Ev { date: Date; type: EvType; title: string; company: string; repeat: string; remind: number; done?: boolean }
+interface Ev {
+  key: string; date: Date; type: EvType; title: string; company: string;
+  repeat: string; remindDays: number | null; id?: string; taskNum?: number;
+}
 
 const MONTHS = ["январь","февраль","март","апрель","май","июнь","июль","август","сентябрь","октябрь","ноябрь","декабрь"];
 const MONTHS_G = ["января","февраля","марта","апреля","мая","июня","июля","августа","сентября","октября","ноября","декабря"];
 const DOW = ["Пн","Вт","Ср","Чт","Пт","Сб","Вс"];
 const DOW_FULL = ["понедельник","вторник","среда","четверг","пятница","суббота","воскресенье"];
-
-function seed(): Ev[] {
-  const y = new Date().getFullYear();
-  const out: Ev[] = [];
-  const ev = (m: number, d: number, type: EvType, title: string, company: string, repeat: string, remind: number) =>
-    out.push({ date: new Date(y, m, d), type, title, company, repeat, remind });
-  for (let m = 5; m <= 9; m++) {
-    ev(m, 12, "tax", "НДФЛ и соцвзносы с зарплаты", "Все клиенты", "Ежемесячно", 3);
-    ev(m, 20, "tax", "Декларация и оплата НДС", "Клиенты на ОСНО/НДС", "Ежемесячно", 3);
-    ev(m, 25, "tax", "Авансовый платёж по УСН", "Клиенты на УСН", "Ежеквартально", 7);
-    ev(m, 5, "pay", "Аренда офиса — 12 000 000 сум", "ООО «ТехноСфера»", "Ежемесячно", 3);
-    ev(m, 10, "pay", "Интернет и связь — 850 000 сум", "ООО «ТехноСфера»", "Ежемесячно", 1);
-    ev(m, 15, "pay", "Аренда склада — 26 000 000 сум", "ООО «Логистик Групп»", "Ежемесячно", 3);
-  }
-  ev(6, 27, "tax", "6-НДФЛ за полугодие", "Все клиенты", "Ежеквартально", 7);
-  ev(7, 1, "pay", "Страховка автопарка — 34 000 000 сум", "ООО «Логистик Групп»", "Ежегодно", 7);
-  ev(6, 10, "task", "Ответ на требование ГНИ № 14-08/2214", "ООО «СтройГарант»", "", 1);
-  ev(6, 25, "task", "Декларация по НДС за II квартал (№ 1247)", "ООО «ТехноСфера»", "", 3);
-  return out;
-}
 
 const pill: Record<EvType, string> = {
   tax: "bg-violet-50 text-violet-600 border-l-violet-500",
@@ -41,17 +29,52 @@ const typeIconBg: Record<EvType, string> = {
 };
 const typeName: Record<EvType, string> = { tax: "Налог / отчёт", pay: "Платёж", task: "Задача" };
 
+const REPEAT_LABEL: Record<CalendarEventEntry["repeat"], string> = {
+  once: "Однократно", monthly: "Ежемесячно", quarterly: "Ежеквартально", yearly: "Ежегодно",
+};
+const REPEAT_VALUE: Record<string, CalendarEventEntry["repeat"]> = {
+  "Однократно": "once", "Ежемесячно": "monthly", "Ежеквартально": "quarterly", "Ежегодно": "yearly",
+};
+const REMIND_VALUE: Record<string, number> = {
+  "в день события": 0, "за 1 день": 1, "за 3 дня": 3, "за неделю": 7,
+};
+
 const sameDay = (a: Date, b: Date) =>
   a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 const fmt = (d: Date) => `${d.getDate()} ${MONTHS_G[d.getMonth()]}`;
+const parseISODate = (s: string) => new Date(s + "T00:00:00");
 
 export default function Calendar() {
+  const navigate = useNavigate();
   const today = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; }, []);
-  const [events, setEvents] = useState<Ev[]>(seed);
+
+  const tasks = useTasks();
+  const clients = useClients();
+  const calendarEvents = useCalendarEvents();
+  useEffect(() => { void hydrateClients(); void hydrateCalendarEvents(); }, []);
+
+  const events: Ev[] = useMemo(() => {
+    const fromTasks: Ev[] = tasks
+      .filter((t) => t.dueDate && t.status !== "Выполнена")
+      .map((t) => ({
+        key: "task:" + t.id, date: parseISODate(t.dueDate!), type: "task" as const,
+        title: t.title, company: t.client, repeat: "", remindDays: null, taskNum: t.id,
+      }));
+    const fromEvents: Ev[] = calendarEvents
+      .filter((e) => e.active)
+      .map((e) => ({
+        key: "ce:" + e.id, date: parseISODate(e.date), type: e.type,
+        title: e.title, company: e.company || "Все клиенты",
+        repeat: REPEAT_LABEL[e.repeat], remindDays: e.remindDays, id: e.id,
+      }));
+    return [...fromTasks, ...fromEvents];
+  }, [tasks, calendarEvents]);
+
   const [cur, setCur] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
   const [filter, setFilter] = useState<"all" | EvType>("all");
   const [day, setDay] = useState<Date | null>(null);
   const [showNew, setShowNew] = useState(false);
+  const [deleteEv, setDeleteEv] = useState<Ev | null>(null);
 
   const visible = (e: Ev) => filter === "all" || e.type === filter;
   const eventsOn = (d: Date) => events.filter((e) => sameDay(e.date, d) && visible(e));
@@ -67,11 +90,11 @@ export default function Calendar() {
   }, [cur]);
 
   const upcoming = events
-    .filter((e) => { const dd = daysDiff(e.date); return dd >= 0 && dd <= 14 && visible(e) && !e.done; })
+    .filter((e) => { const dd = daysDiff(e.date); return dd >= 0 && dd <= 14 && visible(e); })
     .sort((a, b) => a.date.getTime() - b.date.getTime())
     .slice(0, 7);
 
-  // Форма напоминания
+  /* Форма напоминания */
   const [nType, setNType] = useState<"tax" | "pay">("pay");
   const [nTitle, setNTitle] = useState("");
   const [nCompany, setNCompany] = useState("Все клиенты");
@@ -81,19 +104,23 @@ export default function Calendar() {
   });
   const [nRepeat, setNRepeat] = useState("Ежемесячно");
   const [nRemind, setNRemind] = useState("за 3 дня");
+  const [saving, setSaving] = useState(false);
   const suggests = nType === "pay"
     ? ["Аренда офиса", "Интернет и связь", "Коммунальные", "Лизинг", "Страховка"]
     : ["Оплата НДС", "Аванс по УСН", "НДФЛ и соцвзносы", "Отчёт в статистику"];
+  const companyOptions = ["Все клиенты", ...clients.map((c) => c.company)];
 
-  const createReminder = () => {
+  const createReminder = async () => {
     if (!nTitle.trim()) { toast("Укажите название напоминания"); return; }
-    const d = new Date(nDate + "T00:00:00");
-    setEvents((s) => [...s, {
-      date: d, type: nType, title: nTitle.trim(), company: nCompany,
-      repeat: nRepeat === "Однократно" ? "" : nRepeat,
-      remind: nRemind === "в день события" ? 0 : nRemind === "за 1 день" ? 1 : nRemind === "за 3 дня" ? 3 : 7,
-    }]);
-    setCur(new Date(d.getFullYear(), d.getMonth(), 1));
+    setSaving(true);
+    const r = await createCalendarEvent({
+      type: nType, title: nTitle.trim(),
+      company: nCompany === "Все клиенты" ? null : nCompany,
+      date: nDate, repeat: REPEAT_VALUE[nRepeat], remindDays: REMIND_VALUE[nRemind],
+    });
+    setSaving(false);
+    if (!r.ok) { toast(r.error || "Не удалось создать напоминание"); return; }
+    setCur(new Date(parseISODate(nDate).getFullYear(), parseISODate(nDate).getMonth(), 1));
     setShowNew(false); setNTitle("");
     toast(`Напоминание создано · бот напомнит ${nRemind}`);
   };
@@ -140,8 +167,8 @@ export default function Calendar() {
                 <button key={i} onClick={() => setDay(d)}
                   className={`flex min-h-24 flex-col gap-0.5 border-r border-b border-slate-100 p-1.5 text-left transition hover:bg-slate-50 ${other ? "bg-slate-50/60 opacity-60" : ""}`}>
                   <span className={`flex size-6 items-center justify-center rounded-full text-xs font-semibold ${isToday ? "bg-brand-600 text-white" : "text-slate-500"}`}>{d.getDate()}</span>
-                  {evs.slice(0, 3).map((e, j) => (
-                    <span key={j} className={`truncate rounded border-l-2 px-1.5 py-px text-[10.5px] font-medium ${pill[e.type]} ${e.done ? "line-through opacity-50" : ""}`}>{e.title}</span>
+                  {evs.slice(0, 3).map((e) => (
+                    <span key={e.key} className={`truncate rounded border-l-2 px-1.5 py-px text-[10.5px] font-medium ${pill[e.type]}`}>{e.title}</span>
                   ))}
                   {evs.length > 3 && <span className="px-1.5 text-[10px] text-slate-400">ещё {evs.length - 3}</span>}
                 </button>
@@ -153,16 +180,18 @@ export default function Calendar() {
         <Card>
           <CardHeader title="Ближайшие сроки" action={<Badge tone="red">14 дней</Badge>} />
           <div className="divide-y divide-slate-100">
-            {upcoming.map((e, i) => {
+            {upcoming.map((e) => {
               const dd = daysDiff(e.date);
               const Icon = typeIcon[e.type];
               return (
-                <div key={i} className="flex items-start gap-3 px-4 py-3">
+                <div key={e.key} className="flex items-start gap-3 px-4 py-3">
                   <span className={`flex size-8 shrink-0 items-center justify-center rounded-lg ${typeIconBg[e.type]}`}><Icon className="size-4" /></span>
                   <div className="min-w-0 flex-1">
                     <div className="line-clamp-2 text-[13px] leading-snug font-semibold">{e.title}</div>
                     <div className="mt-0.5 text-[11.5px] text-slate-400">{e.company} · {fmt(e.date)}{e.repeat && ` · 🔁 ${e.repeat.toLowerCase()}`}</div>
-                    <div className="mt-1 flex items-center gap-1 text-[11px] text-cyan-600"><Send className="size-3" />бот уведомит за {e.remind} дн.</div>
+                    {e.remindDays !== null && (
+                      <div className="mt-1 flex items-center gap-1 text-[11px] text-cyan-600"><Send className="size-3" />бот уведомит за {e.remindDays} дн.</div>
+                    )}
                   </div>
                   <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${dd === 0 ? "bg-red-50 text-red-600" : dd <= 3 ? "bg-amber-50 text-amber-600" : "bg-slate-100 text-slate-500"}`}>
                     {dd === 0 ? "сегодня" : dd === 1 ? "завтра" : `через ${dd} дн.`}
@@ -184,21 +213,28 @@ export default function Calendar() {
         </button>}>
         {day && (
           <div className="divide-y divide-slate-100">
-            {eventsOn(day).map((e, i) => {
+            {eventsOn(day).map((e) => {
               const Icon = typeIcon[e.type];
               return (
-                <div key={i} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
+                <div key={e.key} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
                   <span className={`flex size-8 shrink-0 items-center justify-center rounded-lg ${typeIconBg[e.type]}`}><Icon className="size-4" /></span>
                   <div className="min-w-0 flex-1">
-                    <div className={`text-[13.5px] font-semibold ${e.done ? "line-through opacity-50" : ""}`}>{e.title}</div>
+                    <div className="text-[13.5px] font-semibold">{e.title}</div>
                     <div className="text-xs text-slate-400">{typeName[e.type]} · {e.company}{e.repeat && ` · 🔁 ${e.repeat.toLowerCase()}`}</div>
                   </div>
-                  {e.type !== "task" && !e.done && (
-                    <div className="flex shrink-0 gap-1.5">
-                      <button onClick={() => toast(`Задача создана: «${e.title}»`)} className="flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium hover:bg-slate-50"><ListPlus className="size-3.5" />В задачи</button>
-                      <button onClick={() => { setEvents((s) => s.map((x) => (x === e ? { ...x, done: true } : x))); toast("Отмечено выполненным"); }} className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium hover:bg-slate-50">Готово</button>
-                    </div>
-                  )}
+                  <div className="flex shrink-0 gap-1.5">
+                    {e.type === "task" ? (
+                      <button onClick={() => { setDay(null); navigate(`/tasks?open=${e.taskNum}`); }}
+                        className="flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium hover:bg-slate-50">
+                        <ExternalLink className="size-3.5" />Открыть задачу
+                      </button>
+                    ) : (
+                      <button onClick={() => setDeleteEv(e)}
+                        className="flex items-center gap-1 rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50">
+                        <Trash2 className="size-3.5" />Удалить
+                      </button>
+                    )}
+                  </div>
                 </div>
               );
             })}
@@ -211,7 +247,9 @@ export default function Calendar() {
       <Modal open={showNew} onClose={() => setShowNew(false)} title="Новое напоминание"
         footer={<>
           <button onClick={() => setShowNew(false)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium hover:bg-slate-50">Отмена</button>
-          <button onClick={createReminder} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700">Создать</button>
+          <button disabled={saving} onClick={createReminder} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-60">
+            {saving ? "Создаём…" : "Создать"}
+          </button>
         </>}>
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-2.5">
@@ -235,7 +273,7 @@ export default function Calendar() {
             <div>
               <label className="mb-1.5 block text-[13px] font-medium">Компания</label>
               <select value={nCompany} onChange={(e) => setNCompany(e.target.value)} className={inp}>
-                {["Все клиенты", "ООО «ТехноСфера»", "ООО «СтройГарант»", "ООО «Логистик Групп»", "ООО «МедФарм»"].map((c) => <option key={c}>{c}</option>)}
+                {companyOptions.map((c) => <option key={c}>{c}</option>)}
               </select>
             </div>
             <div>
@@ -245,19 +283,34 @@ export default function Calendar() {
             <div>
               <label className="mb-1.5 block text-[13px] font-medium">Повтор</label>
               <select value={nRepeat} onChange={(e) => setNRepeat(e.target.value)} className={inp}>
-                {["Однократно", "Ежедневно", "Еженедельно", "Ежемесячно", "Ежеквартально", "Ежегодно"].map((c) => <option key={c}>{c}</option>)}
+                {Object.keys(REPEAT_VALUE).map((c) => <option key={c}>{c}</option>)}
               </select>
             </div>
             <div>
               <label className="mb-1.5 block text-[13px] font-medium">Напомнить</label>
               <select value={nRemind} onChange={(e) => setNRemind(e.target.value)} className={inp}>
-                {["в день события", "за 1 день", "за 3 дня", "за неделю"].map((c) => <option key={c}>{c}</option>)}
+                {Object.keys(REMIND_VALUE).map((c) => <option key={c}>{c}</option>)}
               </select>
             </div>
           </div>
-          <p className="flex items-center gap-2 text-xs text-slate-400"><Send className="size-3.5" />Бот напомнит в Telegram-группе и создаст задачу при приближении срока.</p>
+          <p className="flex items-center gap-2 text-xs text-slate-400"><Send className="size-3.5" />Бот напомнит в Telegram-группе при приближении срока.</p>
         </div>
       </Modal>
+
+      <ConfirmModal
+        open={!!deleteEv} onClose={() => setDeleteEv(null)}
+        title="Удалить напоминание?"
+        text={deleteEv ? `«${deleteEv.title}» больше не будет напоминаться.` : ""}
+        confirmLabel="Удалить"
+        onConfirm={() => {
+          if (!deleteEv?.id) return;
+          const id = deleteEv.id;
+          void removeCalendarEvent(id).then((r) => {
+            if (r.ok) toast("Напоминание удалено"); else toast(r.error || "Не удалось удалить");
+          });
+          setDay(null);
+        }}
+      />
     </div>
   );
 }

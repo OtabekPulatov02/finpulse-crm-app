@@ -8,6 +8,7 @@ import { Avatar, Menu, MenuDivider, MenuItem, Toaster, toast } from "./ui";
 import { displayStatus, hydrateFromBot, isOverdue, resetTasksStore, useTasks } from "../store/tasks";
 import { hydrateClients, resetClientsStore, useClients } from "../store/clients";
 import { resetEmployeesStore } from "../store/employees";
+import { resetCalendarEventsStore } from "../store/calendarEvents";
 import { clearSession, ROLE_LABEL, useSession } from "../auth";
 
 const ALL_NAV = [
@@ -159,6 +160,7 @@ export default function Layout() {
     resetTasksStore();
     resetClientsStore();
     resetEmployeesStore();
+    resetCalendarEventsStore();
     navigate("/login", { replace: true });
   }
 

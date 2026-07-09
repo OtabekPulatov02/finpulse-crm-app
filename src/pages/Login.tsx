@@ -5,6 +5,7 @@ import { setSession, type Role } from "../auth";
 import { resetTasksStore } from "../store/tasks";
 import { resetClientsStore } from "../store/clients";
 import { resetEmployeesStore } from "../store/employees";
+import { resetCalendarEventsStore } from "../store/calendarEvents";
 
 export default function Login() {
   const [identity, setIdentity] = useState("");
@@ -30,6 +31,7 @@ export default function Login() {
       resetTasksStore();
       resetClientsStore();
       resetEmployeesStore();
+      resetCalendarEventsStore();
       setSession({ token: res.token, role: res.role as Role, name: res.name || identity, company: res.company });
       navigate(res.role === "client" ? "/client" : "/dashboard", { replace: true });
     } catch {
@@ -51,6 +53,7 @@ export default function Login() {
       resetTasksStore();
       resetClientsStore();
       resetEmployeesStore();
+      resetCalendarEventsStore();
       setSession({ token: res.token, role: "guest", name: "Гость" });
       navigate("/dashboard", { replace: true });
     } catch {
