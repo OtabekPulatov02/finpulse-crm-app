@@ -116,7 +116,7 @@ export function Toggle({ defaultChecked = true }: { defaultChecked?: boolean }) 
       onClick={() => setOn(!on)}
       className={`relative h-[22px] w-[38px] shrink-0 rounded-full transition-colors ${on ? "bg-brand-600" : "bg-slate-300"}`}
     >
-      <span className={`absolute top-[3px] size-4 rounded-full bg-white shadow transition-transform ${on ? "translate-x-[19px]" : "translate-x-[3px]"}`} />
+      <span className={`absolute top-[3px] size-4 rounded-full bg-white shadow transition-[left] ${on ? "left-[19px]" : "left-[3px]"}`} />
     </button>
   );
 }
