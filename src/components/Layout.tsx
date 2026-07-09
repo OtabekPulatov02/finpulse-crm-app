@@ -6,15 +6,16 @@ import {
 import { useEffect } from "react";
 import { Avatar, Menu, MenuDivider, MenuItem, Toaster, toast } from "./ui";
 import { hydrateFromBot, useTasks } from "../store/tasks";
+import { clearSession, ROLE_LABEL, useSession } from "../auth";
 
-const nav = [
-  { to: "/dashboard", label: "Дашборд", icon: LayoutDashboard },
-  { to: "/tasks", label: "Задачи", icon: ListTodo, count: true },
-  { to: "/calendar", label: "Календарь", icon: CalendarDays },
-  { to: "/clients", label: "Клиенты", icon: Building2 },
-  { to: "/employees", label: "Сотрудники", icon: Users },
-  { to: "/analytics", label: "Аналитика", icon: BarChart3 },
-  { to: "/settings", label: "Настройки", icon: Settings },
+const ALL_NAV = [
+  { to: "/dashboard", label: "Дашборд", icon: LayoutDashboard, hideFor: [] as string[] },
+  { to: "/tasks", label: "Задачи", icon: ListTodo, count: true, hideFor: [] as string[] },
+  { to: "/calendar", label: "Календарь", icon: CalendarDays, hideFor: [] as string[] },
+  { to: "/clients", label: "Клиенты", icon: Building2, hideFor: [] as string[] },
+  { to: "/employees", label: "Сотрудники", icon: Users, hideFor: ["accountant", "guest"] },
+  { to: "/analytics", label: "Аналитика", icon: BarChart3, hideFor: [] as string[] },
+  { to: "/settings", label: "Настройки", icon: Settings, hideFor: ["accountant", "guest"] },
 ];
 
 const notifications = [
@@ -24,12 +25,27 @@ const notifications = [
 
 export default function Layout() {
   const tasks = useTasks();
+  const session = useSession();
   useEffect(() => { void hydrateFromBot(); }, []);
   const activeCount = tasks.filter((t) => t.status === "Новая" || t.status === "В работе").length;
   const navigate = useNavigate();
+  const role = session?.role || "admin";
+  const nav = ALL_NAV.filter((item) => !item.hideFor.includes(role));
+  const displayName = session?.name || "Ибрагимова Юлдуз";
+  const roleLabel = session ? ROLE_LABEL[session.role] : "Главбух · супер-админ";
+
+  function logout() {
+    clearSession();
+    navigate("/login", { replace: true });
+  }
 
   return (
-    <div className="flex min-h-screen">
+    <div className={`flex min-h-screen ${role === "guest" ? "pt-6" : ""}`}>
+      {role === "guest" && (
+        <div className="fixed inset-x-0 top-0 z-30 bg-amber-500 py-1 text-center text-[12px] font-medium text-white">
+          Гостевой режим — демо-данные, действия недоступны
+        </div>
+      )}
       <aside className="sticky top-0 flex h-screen w-60 shrink-0 flex-col border-r border-slate-200 bg-white max-lg:hidden">
         <div className="flex items-center gap-2.5 px-5 pt-5 pb-4">
           <div className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-600 to-indigo-600 text-base font-extrabold text-white">
@@ -60,27 +76,31 @@ export default function Layout() {
               )}
             </NavLink>
           ))}
-          <div className="mt-4 mb-1 px-3 text-[11px] font-semibold tracking-wider text-slate-400 uppercase">
-            Интеграции
-          </div>
-          <NavLink
-            to="/integrations"
-            className={({ isActive }) =>
-              `flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                isActive ? "bg-brand-50 text-brand-600" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-              }`
-            }
-          >
-            <Send className="size-[18px]" />
-            Telegram
-          </NavLink>
+          {role !== "guest" && (
+            <>
+              <div className="mt-4 mb-1 px-3 text-[11px] font-semibold tracking-wider text-slate-400 uppercase">
+                Интеграции
+              </div>
+              <NavLink
+                to="/integrations"
+                className={({ isActive }) =>
+                  `flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                    isActive ? "bg-brand-50 text-brand-600" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                  }`
+                }
+              >
+                <Send className="size-[18px]" />
+                Telegram
+              </NavLink>
+            </>
+          )}
         </nav>
         <div className="border-t border-slate-200 p-3">
           <div className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-2 hover:bg-slate-100">
-            <Avatar name="Ибрагимова Юлдуз" />
+            <Avatar name={displayName} />
             <div className="min-w-0">
-              <div className="truncate text-[13px] font-semibold">Ибрагимова Юлдуз</div>
-              <div className="text-[11px] text-slate-400">Главбух · супер-админ</div>
+              <div className="truncate text-[13px] font-semibold">{displayName}</div>
+              <div className="text-[11px] text-slate-400">{roleLabel}</div>
             </div>
           </div>
         </div>
@@ -121,15 +141,19 @@ export default function Layout() {
             </Menu>
             <Menu trigger={
               <button className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-100">
-                <Avatar name="Ибрагимова Юлдуз" />
-                <span className="text-[13px] font-medium max-sm:hidden">Юлдуз</span>
+                <Avatar name={displayName} />
+                <span className="text-[13px] font-medium max-sm:hidden">{displayName.split(" ")[0]}</span>
                 <ChevronDown className="size-3.5 text-slate-400" />
               </button>
             }>
-              <MenuItem icon={<User className="size-4" />} onClick={() => navigate("/employees")}>Мой профиль</MenuItem>
-              <MenuItem icon={<Settings className="size-4" />} onClick={() => navigate("/settings")}>Настройки</MenuItem>
+              {role !== "guest" && role !== "accountant" && (
+                <MenuItem icon={<User className="size-4" />} onClick={() => navigate("/employees")}>Мой профиль</MenuItem>
+              )}
+              {role !== "guest" && role !== "accountant" && (
+                <MenuItem icon={<Settings className="size-4" />} onClick={() => navigate("/settings")}>Настройки</MenuItem>
+              )}
               <MenuDivider />
-              <MenuItem danger icon={<LogOut className="size-4" />} onClick={() => toast("В прототипе выход имитируется")}>Выйти</MenuItem>
+              <MenuItem danger icon={<LogOut className="size-4" />} onClick={logout}>Выйти</MenuItem>
             </Menu>
           </div>
         </header>
