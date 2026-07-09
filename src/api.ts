@@ -1,6 +1,11 @@
 /* Клиент API-моста: тот же бэкенд, что у Telegram-бота (finpulse-crm.vercel.app) */
 
 const API = "https://finpulse-crm.vercel.app/api/crm";
+/* Временный общий ключ (до полноценных JWT-сессий из ролевой системы).
+   ВАЖНО: это НЕ секрет в полном смысле — код фронта публичный, ключ виден
+   в собранном JS-бандле любому желающему. Он лишь закрывает API от
+   случайного/автоматического сканирования, а не от целенаправленного разбора. */
+const API_KEY = import.meta.env.VITE_CRM_API_KEY || "";
 
 export type BotStatus = "new" | "in_progress" | "done";
 
@@ -29,7 +34,10 @@ export interface LogRow {
 export interface PendingClient { company: string; phone: string | null; at: string | null }
 
 async function get<T>(params: string): Promise<T> {
-  const r = await fetch(`${API}?${params}`, { signal: AbortSignal.timeout(8000) });
+  const r = await fetch(`${API}?${params}`, {
+    signal: AbortSignal.timeout(8000),
+    headers: API_KEY ? { "x-api-key": API_KEY } : {},
+  });
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   return r.json();
 }
@@ -49,7 +57,10 @@ export const fetchPending = () =>
 export async function pushBotStatus(num: number, status: BotStatus, assignee?: string) {
   const r = await fetch(API, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": "application/json",
+      ...(API_KEY ? { "x-api-key": API_KEY } : {}),
+    },
     body: JSON.stringify({ action: "status", num, status, assignee }),
     signal: AbortSignal.timeout(10000),
   });
