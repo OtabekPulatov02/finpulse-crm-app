@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { BookOpen, Bell, GitBranch, Pencil, Plus, ScrollText, Shield, Tags, UserPlus, Users } from "lucide-react";
 import { Avatar, Badge, Card, CardHeader, Toggle, toast, type Tone } from "../components/ui";
+import { fetchLogs, fmtTs, type LogRow } from "../api";
 
 const tabs = [
   { id: "users", label: "Пользователи", icon: Users },
@@ -21,7 +22,7 @@ const users = [
 ];
 
 const logs = [
-  { time: "сегодня, 14:02:11", src: "tg", event: "Задача создана", who: "Павел Л. @p_litvinov", assignee: "—", details: "№ 1247 «Требование ИФНС по НДС…» · ООО «ТехноСфера» · 📎 1" },
+  { time: "сегодня, 14:02:11", src: "tg", event: "Задача создана", who: "Павел Л. @p_litvinov", assignee: "—", details: "№ 1247 «Требование ГНИ по НДС…» · ООО «ТехноСфера» · 📎 1" },
   { time: "сегодня, 14:02:12", src: "tg", event: "Назначен исполнитель", who: "Елена Крылова", assignee: "Елена Крылова", details: "№ 1247" },
   { time: "сегодня, 13:45:02", src: "crm", event: "Вход в систему", who: "Ибрагимова Юлдуз", assignee: "—", details: "супер-админ" },
   { time: "сегодня, 13:20:44", src: "crm", event: "Изменён статус задачи", who: "Дмитрий Орлов", assignee: "Дмитрий Орлов", details: "№ 1244 «В работе» → «Выполнена»" },
@@ -53,10 +54,56 @@ function DictCard({ title, items, placeholder }: { title: string; items: { label
   );
 }
 
+
+const EVENT_LABEL: Record<string, string> = {
+  task_created: "Задача создана",
+  task_assigned: "Назначен исполнитель",
+  task_done: "Задача выполнена",
+  task_reused: "Задача создана повторно",
+  new_company: "Новая компания",
+  status_changed: "Изменён статус задачи",
+  group_send_failed: "Ошибка отправки в группу",
+};
+const ST_RU: Record<string, string> = { new: "Новая", in_progress: "В работе", done: "Выполнена" };
+
+interface LogView { ts?: string; time: string; src: "tg" | "crm"; event: string; who: string; assignee: string; details: string }
+
+function mapLog(l: LogRow, src: "tg" | "crm"): LogView {
+  const isStatus = l.event === "status_changed";
+  const parts = [
+    l.num ? `№ ${l.num}` : null,
+    isStatus && l.from && l.to ? `«${ST_RU[String(l.from)] ?? l.from}» → «${ST_RU[String(l.to)] ?? l.to}»` : null,
+    l.company ? String(l.company) : null,
+    l.text ? `«${String(l.text).slice(0, 60)}${String(l.text).length > 60 ? "…" : ""}»` : null,
+    typeof l.files === "number" && l.files ? `📎 ${l.files}` : null,
+  ].filter(Boolean);
+  return {
+    ts: l.ts,
+    time: fmtTs(l.ts),
+    src,
+    event: EVENT_LABEL[l.event] ?? l.event,
+    who: String((isStatus ? l.by : l.from) ?? l.by ?? "—"),
+    assignee: l.assignee ? String(l.assignee) : "—",
+    details: parts.join(" · "),
+  };
+}
+
 export default function Settings() {
   const [tab, setTab] = useState<TabId>("users");
   const [logFilter, setLogFilter] = useState<"all" | "tg" | "crm">("all");
-  const shownLogs = logs.filter((l) => logFilter === "all" || l.src === logFilter);
+  const [live, setLive] = useState<LogView[] | null>(null);
+  useEffect(() => {
+    if (tab !== "logs" || live) return;
+    Promise.all([fetchLogs("telegram"), fetchLogs("crm")])
+      .then(([tg, crm]) => {
+        const rows = [...tg.map((l) => mapLog(l, "tg")), ...crm.map((l) => mapLog(l, "crm"))]
+          .sort((a, b) => ((a.ts ?? "") < (b.ts ?? "") ? 1 : -1));
+        if (rows.length) setLive(rows);
+      })
+      .catch(() => {});
+  }, [tab, live]);
+  const allLogs: LogView[] = live ?? (logs as LogView[]);
+  const shownLogs = allLogs.filter((l) => logFilter === "all" || l.src === logFilter);
 
   return (
     <div className="space-y-5">
@@ -199,7 +246,10 @@ export default function Settings() {
                 {l}
               </button>
             ))}
-            <span className="ml-auto text-xs text-slate-400">хранятся последние 500 записей</span>
+            <span className="ml-auto flex items-center gap-1.5 text-xs text-slate-400">
+              {live && <span className="size-1.5 animate-pulse rounded-full bg-emerald-500" />}
+              {live ? "живые данные из бота · хранятся последние 500" : "загрузка… показаны демо-записи"}
+            </span>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-[13px]">

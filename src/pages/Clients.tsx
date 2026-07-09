@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Archive, CheckCircle2, ExternalLink, MoreHorizontal, Pencil, Plus, Search, Trash2, UserPlus,
 } from "lucide-react";
@@ -6,7 +6,8 @@ import {
   Avatar, Badge, Card, ConfirmModal, Field, Input, Menu, MenuDivider,
   MenuItem, Modal, Select, Textarea, toast, type Tone,
 } from "../components/ui";
-import { EMPLOYEE_NAMES, clients } from "../data/demo";
+import { EMPLOYEE_NAMES, clients, type Client } from "../data/demo";
+import { fetchPending } from "../api";
 
 const statusTone: Record<string, Tone> = {
   "Активный": "green", "Новый": "blue", "Из бота": "cyan", "В архиве": "gray",
@@ -61,8 +62,21 @@ export default function Clients() {
   const [editName, setEditName] = useState<string | null>(null);
   const [archiveName, setArchiveName] = useState<string | null>(null);
   const [deleteName, setDeleteName] = useState<string | null>(null);
+  const [botClients, setBotClients] = useState<Client[]>([]);
+  useEffect(() => {
+    fetchPending().then((rows) => {
+      const known = new Set(clients.map((c) => c.name.toLowerCase()));
+      setBotClients(rows
+        .filter((r) => r.company && !known.has(r.company.toLowerCase()))
+        .map((r) => ({
+          name: r.company, inn: "—", tax: "—", contact: "клиент из бота",
+          phone: r.phone ?? "—", manager: "не назначен", status: "Из бота" as const, activeTasks: 0,
+        })));
+    }).catch(() => {});
+  }, []);
+  const allClients = [...botClients, ...clients];
 
-  const filtered = clients.filter((c) =>
+  const filtered = allClients.filter((c) =>
     (c.name + c.contact + c.inn).toLowerCase().includes(q.toLowerCase()) &&
     (fStatus === "Все статусы" || c.status === fStatus)
   );

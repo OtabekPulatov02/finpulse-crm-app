@@ -3,8 +3,9 @@ import {
   AlertCircle, BarChart3, Bell, Building2, CalendarDays, CheckCheck, ChevronDown,
   LayoutDashboard, ListTodo, LogOut, Search, Send, Settings, User, Users,
 } from "lucide-react";
+import { useEffect } from "react";
 import { Avatar, Menu, MenuDivider, MenuItem, Toaster, toast } from "./ui";
-import { useTasks } from "../store/tasks";
+import { hydrateFromBot, useTasks } from "../store/tasks";
 
 const nav = [
   { to: "/dashboard", label: "Дашборд", icon: LayoutDashboard },
@@ -18,11 +19,12 @@ const nav = [
 
 const notifications = [
   { icon: Send, tone: "bg-brand-50 text-brand-600", title: "Новое обращение из Telegram: ООО «ТехноСфера»", time: "5 минут назад" },
-  { icon: AlertCircle, tone: "bg-red-50 text-red-600", title: "Просрочена задача «Ответ на требование ИФНС»", time: "1 час назад" },
+  { icon: AlertCircle, tone: "bg-red-50 text-red-600", title: "Просрочена задача «Ответ на требование ГНИ»", time: "1 час назад" },
 ];
 
 export default function Layout() {
   const tasks = useTasks();
+  useEffect(() => { void hydrateFromBot(); }, []);
   const activeCount = tasks.filter((t) => t.status === "Новая" || t.status === "В работе").length;
   const navigate = useNavigate();
 

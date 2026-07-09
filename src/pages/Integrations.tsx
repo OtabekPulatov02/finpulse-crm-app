@@ -1,3 +1,4 @@
+import { fetchPing } from "../api";
 import { Activity, Copy, Database, Eye, Send } from "lucide-react";
 import { Badge, Card, CardHeader, Toggle, toast } from "../components/ui";
 
@@ -57,7 +58,7 @@ export default function Integrations() {
             </div>
           </div>
           <div className="flex justify-between border-t border-slate-200 px-5 py-4">
-            <button onClick={() => toast("getMe: @finpulse_crm_bot · webhook активен")} className="flex items-center gap-2 rounded-lg border border-slate-200 px-3.5 py-2 text-[13px] font-medium hover:bg-slate-50"><Activity className="size-4" />Проверить</button>
+            <button onClick={() => { fetchPing().then((r) => toast(r.ok ? `Бот на связи: ${r.bot} · задач в базе: ${r.tasks} · группа ${r.group ? "подключена" : "не подключена"}` : "Бот не отвечает")).catch(() => toast("Бот не отвечает — проверьте деплой")); }} className="flex items-center gap-2 rounded-lg border border-slate-200 px-3.5 py-2 text-[13px] font-medium hover:bg-slate-50"><Activity className="size-4" />Проверить</button>
             <button onClick={() => toast("Настройки бота сохранены")} className="rounded-lg bg-brand-600 px-4 py-2 text-[13px] font-medium text-white hover:bg-brand-700">Сохранить</button>
           </div>
         </Card>
@@ -75,7 +76,7 @@ export default function Integrations() {
               </div>
             </div>
             <div className="flex justify-end border-t border-slate-200 px-5 py-4">
-              <button onClick={() => toast("PING → PONG · 14 мс")} className="flex items-center gap-2 rounded-lg border border-slate-200 px-3.5 py-2 text-[13px] font-medium hover:bg-slate-50"><Activity className="size-4" />Проверить соединение</button>
+              <button onClick={() => { const t0 = performance.now(); fetchPing().then(() => toast(`PING → PONG · ${Math.round(performance.now() - t0)} мс · Redis доступен`)).catch(() => toast("Соединение не установлено")); }} className="flex items-center gap-2 rounded-lg border border-slate-200 px-3.5 py-2 text-[13px] font-medium hover:bg-slate-50"><Activity className="size-4" />Проверить соединение</button>
             </div>
           </Card>
 

@@ -5,7 +5,7 @@ import {
 import { Link } from "react-router-dom";
 import { Avatar, Badge, Card, CardHeader, toast } from "../components/ui";
 import { employees, priorityTone } from "../data/demo";
-import { setTaskStatus, useTasks } from "../store/tasks";
+import { isLiveTask, setTaskStatus, useTasks } from "../store/tasks";
 
 const kpi = [
   { label: "Клиенты", value: "48", trend: "+3 за месяц", icon: Building2, tone: "text-brand-600 bg-brand-50" },
@@ -56,6 +56,11 @@ function Donut() {
 export default function Dashboard() {
   const tasks = useTasks();
   const today = tasks.filter((t) => t.status !== "Выполнена" && t.status !== "Отменена").slice(0, 5);
+  const liveReqs = tasks
+    .filter((t) => t.fromBot && isLiveTask(t.id) && t.status !== "Отменена")
+    .slice(0, 3)
+    .map((t) => ({ from: t.client, time: t.created ?? "", msg: t.description ?? t.title, live: true }));
+  const requests = liveReqs.length ? liveReqs : tgRequests.map((r) => ({ ...r, live: false }));
 
   return (
     <div className="space-y-5">
@@ -108,9 +113,11 @@ export default function Dashboard() {
           </Card>
 
           <Card>
-            <CardHeader title="Новые обращения из Telegram" />
+            <CardHeader title="Новые обращения из Telegram" action={
+              liveReqs.length ? <span className="flex items-center gap-1.5 text-xs text-emerald-600"><span className="size-1.5 animate-pulse rounded-full bg-emerald-500" />живые данные бота</span> : undefined
+            } />
             <div className="divide-y divide-slate-100">
-              {tgRequests.map((r) => (
+              {requests.map((r) => (
                 <div key={r.from} className="flex items-center gap-3 px-5 py-3">
                   <Avatar name={r.from.replace(/^(ООО|АО|ИП|MCHJ)\s*«?/, "")} />
                   <div className="min-w-0 flex-1">
