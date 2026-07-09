@@ -152,6 +152,34 @@ export const deleteTaskRequest = (num: number) =>
 export const fetchCalendar = () =>
   get<{ ok: boolean; calendar: CalendarEntry[] }>("r=calendar").then((d) => d.calendar ?? []);
 
+/* ---------------- Сотрудники ---------------- */
+
+export interface CrmEmployee {
+  id: string;
+  name: string;
+  phone: string | null;
+  role: "admin" | "accountant";
+  active: boolean;
+  createdAt?: string | null;
+}
+
+export interface EmployeeResult { ok: boolean; employee?: CrmEmployee; password?: string; error?: string }
+
+export const fetchEmployees = () =>
+  get<{ ok: boolean; employees: CrmEmployee[] }>("r=employees").then((d) => d.employees ?? []);
+
+export const createEmployeeRequest = (data: { name: string; phone: string; role: "admin" | "accountant" }) =>
+  post<EmployeeResult>({ action: "employee_create", ...data });
+
+export const updateEmployeeRequest = (id: string, patch: Partial<Pick<CrmEmployee, "name" | "role" | "active">>) =>
+  post<EmployeeResult>({ action: "employee_update", id, patch });
+
+export const resetEmployeePasswordRequest = (id: string) =>
+  post<EmployeeResult>({ action: "employee_reset_password", id });
+
+export const deleteEmployeeRequest = (id: string) =>
+  post<{ ok: boolean; id?: string; error?: string }>({ action: "employee_delete", id });
+
 /* ---------------- Авторизация ---------------- */
 export interface LoginResult { ok: boolean; token?: string; role?: string; name?: string; company?: string; error?: string }
 
