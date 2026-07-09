@@ -48,3 +48,74 @@ export function Avatar({ name, className = "" }: { name: string; className?: str
     </span>
   );
 }
+
+/* ---------- Modal с blur-фоном ---------- */
+import { X } from "lucide-react";
+import { useEffect, useState } from "react";
+
+export function Modal({
+  open, onClose, title, children, footer, wide,
+}: {
+  open: boolean; onClose: () => void; title: string;
+  children: ReactNode; footer?: ReactNode; wide?: boolean;
+}) {
+  if (!open) return null;
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 p-5 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className={`flex max-h-[calc(100vh-3rem)] w-full flex-col rounded-xl bg-white shadow-2xl ${wide ? "max-w-2xl" : "max-w-lg"}`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+          <h2 className="text-base font-semibold">{title}</h2>
+          <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+            <X className="size-4" />
+          </button>
+        </div>
+        <div className="overflow-y-auto p-5">{children}</div>
+        {footer && <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-4">{footer}</div>}
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Toast ---------- */
+let pushToast: ((msg: string) => void) | null = null;
+export function toast(msg: string) { pushToast?.(msg); }
+
+export function Toaster() {
+  const [items, setItems] = useState<{ id: number; msg: string }[]>([]);
+  useEffect(() => {
+    pushToast = (msg) => {
+      const id = Date.now() + Math.random();
+      setItems((s) => [...s, { id, msg }]);
+      setTimeout(() => setItems((s) => s.filter((i) => i.id !== id)), 3500);
+    };
+    return () => { pushToast = null; };
+  }, []);
+  return (
+    <div className="fixed right-5 bottom-5 z-[100] flex max-w-sm flex-col gap-2">
+      {items.map((i) => (
+        <div key={i.id} className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-[13px] font-medium shadow-lg">
+          {i.msg}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ---------- Toggle ---------- */
+export function Toggle({ defaultChecked = true }: { defaultChecked?: boolean }) {
+  const [on, setOn] = useState(defaultChecked);
+  return (
+    <button
+      onClick={() => setOn(!on)}
+      className={`relative h-[22px] w-[38px] shrink-0 rounded-full transition-colors ${on ? "bg-brand-600" : "bg-slate-300"}`}
+    >
+      <span className={`absolute top-[3px] size-4 rounded-full bg-white shadow transition-transform ${on ? "translate-x-[19px]" : "translate-x-[3px]"}`} />
+    </button>
+  );
+}

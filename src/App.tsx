@@ -3,7 +3,11 @@ import Layout from "./components/Layout";
 import Dashboard from "./pages/Dashboard";
 import Tasks from "./pages/Tasks";
 import Clients from "./pages/Clients";
-import Stub from "./pages/Stub";
+import Calendar from "./pages/Calendar";
+import Employees from "./pages/Employees";
+import Analytics from "./pages/Analytics";
+import Settings from "./pages/Settings";
+import Integrations from "./pages/Integrations";
 
 export default function App() {
   return (
@@ -12,12 +16,12 @@ export default function App() {
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/tasks" element={<Tasks />} />
+        <Route path="/calendar" element={<Calendar />} />
         <Route path="/clients" element={<Clients />} />
-        <Route path="/calendar" element={<Stub title="Календарь" note="Налоги, отчёты и платежи — переносим из прототипа" />} />
-        <Route path="/employees" element={<Stub title="Сотрудники" note="Карточки команды и загрузка" />} />
-        <Route path="/analytics" element={<Stub title="Аналитика" note="Производительность и статистика" />} />
-        <Route path="/settings" element={<Stub title="Настройки" note="Роли, справочники, логи системы" />} />
-        <Route path="/integrations" element={<Stub title="Интеграции" note="Telegram-бот и база данных" />} />
+        <Route path="/employees" element={<Employees />} />
+        <Route path="/analytics" element={<Analytics />} />
+        <Route path="/settings" element={<Settings />} />
+        <Route path="/integrations" element={<Integrations />} />
       </Route>
     </Routes>
   );

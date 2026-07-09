@@ -3,7 +3,7 @@ import {
   BarChart3, Bell, Building2, CalendarDays, LayoutDashboard,
   ListTodo, Search, Send, Settings, Users,
 } from "lucide-react";
-import { Avatar } from "./ui";
+import { Avatar, Toaster } from "./ui";
 
 const nav = [
   { to: "/dashboard", label: "Дашборд", icon: LayoutDashboard },
@@ -94,6 +94,7 @@ export default function Layout() {
         <main className="mx-auto w-full max-w-7xl flex-1 p-6">
           <Outlet />
         </main>
+        <Toaster />
       </div>
     </div>
   );
