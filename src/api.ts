@@ -204,6 +204,33 @@ export async function guestLoginRequest(): Promise<LoginResult> {
   return r.json();
 }
 
+/* ---------------- Календарь: повторяющиеся события (налоги/платежи) ---------------- */
+
+export interface CalendarEventEntry {
+  id: string;
+  type: "tax" | "pay";
+  title: string;
+  company: string | null;
+  date: string; // "YYYY-MM-DD" — дата следующего срабатывания
+  repeat: "once" | "monthly" | "quarterly" | "yearly";
+  remindDays: number;
+  active: boolean;
+  createdAt?: string | null;
+}
+
+export interface CalendarEventResult { ok: boolean; event?: CalendarEventEntry; error?: string }
+
+export const fetchCalendarEvents = () =>
+  get<{ ok: boolean; events: CalendarEventEntry[] }>("r=calendar_events").then((d) => d.events ?? []);
+
+export const createCalendarEventRequest = (data: {
+  type: "tax" | "pay"; title: string; company?: string | null; date: string;
+  repeat?: CalendarEventEntry["repeat"]; remindDays?: number;
+}) => post<CalendarEventResult>({ action: "calendar_event_create", ...data });
+
+export const deleteCalendarEventRequest = (id: string) =>
+  post<{ ok: boolean; error?: string }>({ action: "calendar_event_delete", id });
+
 export function fmtTs(ts?: string | null): string {
   if (!ts) return "—";
   const d = new Date(ts);
