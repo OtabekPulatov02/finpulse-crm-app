@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   Archive, Calendar, Check, ExternalLink, Hash, Kanban, LayoutList, MoreHorizontal,
   Pencil, Plus, RotateCcw, Search, Send, Trash2,
@@ -204,6 +205,16 @@ export default function Tasks() {
   const [createStatus, setCreateStatus] = useState<TaskStatus>("Новая");
   const [deleteTaskT, setDeleteTaskT] = useState<Task | null>(null);
   const [formKey, setFormKey] = useState(0);
+
+  /* Открытие карточки задачи по ссылке из поиска в шапке (?open=<id>) */
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    const openId = searchParams.get("open");
+    if (!openId || !tasks.length) return;
+    const t = tasks.find((t) => t.id === Number(openId));
+    if (t) setViewTask(t);
+    setSearchParams((p) => { p.delete("open"); return p; }, { replace: true });
+  }, [searchParams, tasks, setSearchParams]);
 
   const openCreate = (status: TaskStatus = "Новая") => {
     setCreateStatus(status); setFormKey((k) => k + 1); setCreateOpen(true);

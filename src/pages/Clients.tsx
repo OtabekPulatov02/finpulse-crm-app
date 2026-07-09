@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   Archive, CheckCircle2, ExternalLink, MoreHorizontal, Pencil, Plus, Search, Trash2, UserPlus,
 } from "lucide-react";
@@ -101,6 +102,16 @@ export default function Clients() {
   const [editClient, setEditClient] = useState<CrmClient | null>(null);
   const [archiveClient, setArchiveClient] = useState<CrmClient | null>(null);
   const [deleteClient, setDeleteClient] = useState<CrmClient | null>(null);
+
+  /* Открытие карточки клиента по ссылке из поиска в шапке (?open=<id>) */
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    const openId = searchParams.get("open");
+    if (!openId || !clients.length) return;
+    const c = clients.find((c) => c.id === openId);
+    if (c) setEditClient(c);
+    setSearchParams((p) => { p.delete("open"); return p; }, { replace: true });
+  }, [searchParams, clients, setSearchParams]);
 
   const filtered = clients.filter((c) =>
     (c.company + (c.position || "") + (c.phone || "")).toLowerCase().includes(q.toLowerCase()) &&
