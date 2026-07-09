@@ -3,15 +3,14 @@ import {
   createTaskRequest, deleteTaskRequest, fetchBotTasks, pushBotStatus, updateTaskRequest,
   fmtTs, type BotStatus,
 } from "../api";
-import { initialTasks, type Task, type TaskStatus } from "../data/demo";
+import type { Task, TaskStatus } from "../data/demo";
 import { getSession } from "../auth";
 
-let tasks: Task[] = [...initialTasks];
+let tasks: Task[] = [];
 const listeners = new Set<() => void>();
 
 /* id реальных задач (из Telegram-бота ИЛИ созданных из CRM через реальный
-   API) — их статусы/поля синхронизируются с бэкендом. Задачи из demo.ts
-   остаются локальной "витриной" и в бэкенд не пишутся. */
+   API) — все задачи в CRM теперь живые, синхронизируются с бэкендом. */
 const liveIds = new Set<number>();
 let hydrated = false;
 
@@ -35,7 +34,7 @@ export const isLiveTask = (id: number) => liveIds.has(id);
 export function resetTasksStore() {
   hydrated = false;
   liveIds.clear();
-  tasks = [...initialTasks];
+  tasks = [];
   emit();
 }
 
@@ -80,7 +79,7 @@ export async function hydrateFromBot() {
     tasks = [...live, ...tasks.filter((t) => !liveIds.has(t.id))];
     emit();
   } catch {
-    hydrated = false; /* бэкенд недоступен — попробуем ещё раз при следующем обращении, пока показываем демо-данные */
+    hydrated = false; /* бэкенд недоступен — попробуем ещё раз при следующем обращении */
   }
 }
 
@@ -113,16 +112,18 @@ export function displayStatus(t: Task): TaskStatus {
   return t.status;
 }
 
-/* Локальное обновление (для демо-задач, не связанных с бэкендом) */
-export function updateTask(id: number, patch: Partial<Task>) {
-  const t = tasks.find((t) => t.id === id);
-  if (t) { Object.assign(t, patch); emit(); }
+/* Просрочена ли задача по дате "due" (формат ДД.ММ). Выполненные и
+   заархивированные задачи никогда не считаются просроченными. */
+export function isOverdue(t: Task): boolean {
+  if (t.status === "Выполнена") return false;
+  const m = t.due.match(/^(\d{2})\.(\d{2})/);
+  if (!m) return false;
+  const now = new Date();
+  return new Date(now.getFullYear(), +m[2] - 1, +m[1]) < new Date(now.getFullYear(), now.getMonth(), now.getDate());
 }
 
-/* Создание задачи. Если передан clientId (реальная карточка клиента) или
-   компания совпадает с существующим клиентом — задача уходит в реальный
-   бэкенд (карточка в группу бухгалтеров + уведомление клиенту в Telegram).
-   Иначе остаётся локальной демо-задачей (для витрины интерфейса). */
+/* Создание задачи — всегда уходит в реальный бэкенд (карточка в группу
+   бухгалтеров + уведомление клиенту в Telegram, если передан clientId). */
 export async function createTask(data: {
   title: string; client: string; clientId?: string | null; assignee: string;
   priority: Task["priority"]; dueDate?: string | null; description?: string;
@@ -158,16 +159,6 @@ export async function createTask(data: {
   emit();
   void actor;
   return { ok: true };
-}
-
-/* Добавление чисто локальной (демо) задачи — без обращения к бэкенду.
-   Используется только когда клиент не выбран из реального списка. */
-export function addLocalTask(data: Omit<Task, "id">): Task {
-  const id = Math.max(...tasks.map((t) => t.id), 1300) + 1;
-  const t = { id, ...data };
-  tasks = [t, ...tasks];
-  emit();
-  return t;
 }
 
 export async function editTask(id: number, patch: {

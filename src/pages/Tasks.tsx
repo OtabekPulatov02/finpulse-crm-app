@@ -11,7 +11,7 @@ import {
   EDITABLE_STATUSES, PRIORITIES, STATUSES,
   priorityTone, statusTone, type Priority, type Task, type TaskStatus,
 } from "../data/demo";
-import { createTask, deleteTaskEverywhere, displayStatus, editTask, setTaskStatus, useTasks } from "../store/tasks";
+import { createTask, deleteTaskEverywhere, displayStatus, editTask, isOverdue, setTaskStatus, useTasks } from "../store/tasks";
 import { hydrateClients, useClients } from "../store/clients";
 import { hydrateEmployees, useEmployees } from "../store/employees";
 
@@ -30,14 +30,6 @@ const prioBorder: Record<Priority, string> = {
   "Высокий": "border-l-amber-500",
   "Критический": "border-l-red-500",
 };
-
-function isOverdue(t: Task): boolean {
-  if (t.status === "Выполнена") return false;
-  const m = t.due.match(/^(\d{2})\.(\d{2})/);
-  if (!m) return false;
-  const now = new Date();
-  return new Date(now.getFullYear(), +m[2] - 1, +m[1]) < new Date(now.getFullYear(), now.getMonth(), now.getDate());
-}
 
 function sourceLabel(t: Task) {
   if (t.source === "crm") return "из CRM";
