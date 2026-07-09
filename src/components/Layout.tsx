@@ -5,7 +5,7 @@ import {
 } from "lucide-react";
 import { useEffect } from "react";
 import { Avatar, Menu, MenuDivider, MenuItem, Toaster, toast } from "./ui";
-import { hydrateFromBot, resetTasksStore, useTasks } from "../store/tasks";
+import { displayStatus, hydrateFromBot, isOverdue, resetTasksStore, useTasks } from "../store/tasks";
 import { hydrateClients, resetClientsStore } from "../store/clients";
 import { resetEmployeesStore } from "../store/employees";
 import { clearSession, ROLE_LABEL, useSession } from "../auth";
@@ -20,16 +20,31 @@ const ALL_NAV = [
   { to: "/settings", label: "Настройки", icon: Settings, hideFor: ["accountant", "guest"] },
 ];
 
-const notifications = [
-  { icon: Send, tone: "bg-brand-50 text-brand-600", title: "Новое обращение из Telegram: ООО «ТехноСфера»", time: "5 минут назад" },
-  { icon: AlertCircle, tone: "bg-red-50 text-red-600", title: "Просрочена задача «Ответ на требование ГНИ»", time: "1 час назад" },
-];
-
 export default function Layout() {
   const tasks = useTasks();
   const session = useSession();
   useEffect(() => { void hydrateFromBot(); void hydrateClients(); }, []);
   const activeCount = tasks.filter((t) => t.status === "Новая" || t.status === "В работе").length;
+  const notifications = [
+    ...tasks
+      .filter((t) => t.fromBot && displayStatus(t) === "Новая")
+      .map((t) => ({
+        id: t.id,
+        icon: Send, tone: "bg-brand-50 text-brand-600",
+        title: `Новое обращение из Telegram: ${t.client}`,
+        time: t.created ?? "",
+      })),
+    ...tasks
+      .filter(isOverdue)
+      .map((t) => ({
+        id: t.id,
+        icon: AlertCircle, tone: "bg-red-50 text-red-600",
+        title: `Просрочена задача «${t.title}»`,
+        time: `срок был ${t.due}`,
+      })),
+  ]
+    .sort((a, b) => b.id - a.id)
+    .slice(0, 3);
   const navigate = useNavigate();
   const role = session?.role || "admin";
   const nav = ALL_NAV.filter((item) => !item.hideFor.includes(role));
@@ -124,12 +139,14 @@ export default function Layout() {
             <Menu trigger={
               <button className="relative rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900">
                 <Bell className="size-[18px]" />
-                <span className="absolute top-1.5 right-1.5 size-2 rounded-full border-2 border-white bg-red-500" />
+                {notifications.length > 0 && (
+                  <span className="absolute top-1.5 right-1.5 size-2 rounded-full border-2 border-white bg-red-500" />
+                )}
               </button>
             }>
               <div className="px-3.5 pt-1 pb-2 text-xs font-semibold tracking-wider text-slate-400 uppercase">Уведомления</div>
-              {notifications.map((n, i) => (
-                <div key={i} className="flex items-start gap-2.5 px-3.5 py-2.5 hover:bg-slate-50">
+              {notifications.length ? notifications.map((n) => (
+                <div key={n.id + n.title} className="flex items-start gap-2.5 px-3.5 py-2.5 hover:bg-slate-50">
                   <span className={`mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg ${n.tone}`}>
                     <n.icon className="size-3.5" />
                   </span>
@@ -138,11 +155,17 @@ export default function Layout() {
                     <div className="mt-0.5 text-[11px] text-slate-400">{n.time}</div>
                   </div>
                 </div>
-              ))}
-              <MenuDivider />
-              <MenuItem icon={<CheckCheck className="size-4" />} onClick={() => toast("Все уведомления отмечены прочитанными")}>
-                Отметить всё прочитанным
-              </MenuItem>
+              )) : (
+                <div className="px-3.5 py-6 text-center text-[12.5px] text-slate-400">Новых уведомлений нет</div>
+              )}
+              {notifications.length > 0 && (
+                <>
+                  <MenuDivider />
+                  <MenuItem icon={<CheckCheck className="size-4" />} onClick={() => toast("Все уведомления отмечены прочитанными")}>
+                    Отметить всё прочитанным
+                  </MenuItem>
+                </>
+              )}
             </Menu>
             <Menu trigger={
               <button className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-100">
