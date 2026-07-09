@@ -85,28 +85,30 @@ export default function Settings() {
 
       {tab === "users" && (
         <Card>
-          <div className="flex items-center justify-between border-b border-slate-200 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 p-4">
             <span className="text-sm font-semibold">{employees.length} {employees.length === 1 ? "сотрудник" : "сотрудника"}</span>
             <Link to="/employees" className="flex items-center gap-2 rounded-lg bg-brand-600 px-3.5 py-2 text-[13px] font-medium text-white hover:bg-brand-700"><UserPlus className="size-4" />Управлять в разделе «Сотрудники»</Link>
           </div>
           {employees.length ? (
-            <table className="w-full text-[13.5px]">
-              <thead>
-                <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold tracking-wider text-slate-400 uppercase">
-                  <th className="px-5 py-3">Сотрудник</th><th className="px-4 py-3">Телефон (логин)</th><th className="px-4 py-3">Роль</th><th className="px-4 py-3">Статус</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {employees.map((e) => (
-                  <tr key={e.id} className="hover:bg-slate-50">
-                    <td className="px-5 py-3"><span className="flex items-center gap-2.5 font-medium"><Avatar name={e.name} />{e.name}</span></td>
-                    <td className="px-4 py-3 text-slate-500">{e.phone ?? "—"}</td>
-                    <td className="px-4 py-3"><Badge tone={ROLE_TONE[e.role] ?? "gray"}>{ROLE_LABEL[e.role] ?? e.role}</Badge></td>
-                    <td className="px-4 py-3">{e.active ? <Badge tone="green">Активен</Badge> : <Badge tone="gray">Отключён</Badge>}</td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-[13.5px]">
+                <thead>
+                  <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold tracking-wider text-slate-400 uppercase">
+                    <th className="px-5 py-3">Сотрудник</th><th className="px-4 py-3">Телефон (логин)</th><th className="px-4 py-3">Роль</th><th className="px-4 py-3">Статус</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {employees.map((e) => (
+                    <tr key={e.id} className="hover:bg-slate-50">
+                      <td className="px-5 py-3 whitespace-nowrap"><span className="flex items-center gap-2.5 font-medium"><Avatar name={e.name} />{e.name}</span></td>
+                      <td className="px-4 py-3 whitespace-nowrap text-slate-500">{e.phone ?? "—"}</td>
+                      <td className="px-4 py-3 whitespace-nowrap"><Badge tone={ROLE_TONE[e.role] ?? "gray"}>{ROLE_LABEL[e.role] ?? e.role}</Badge></td>
+                      <td className="px-4 py-3 whitespace-nowrap">{e.active ? <Badge tone="green">Активен</Badge> : <Badge tone="gray">Отключён</Badge>}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           ) : (
             <p className="px-5 py-8 text-center text-sm text-slate-400">Сотрудники ещё не добавлены — создайте первого в разделе «Сотрудники».</p>
           )}
