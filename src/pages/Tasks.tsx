@@ -1,17 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  Calendar, Check, ExternalLink, Hash, Kanban, LayoutList, MoreHorizontal,
-  Pencil, Plus, RotateCcw, Search, Send, Trash2, X,
+  Archive, Calendar, Check, ExternalLink, Hash, Kanban, LayoutList, MoreHorizontal,
+  Pencil, Plus, RotateCcw, Search, Send, Trash2,
 } from "lucide-react";
 import {
   Avatar, Badge, Card, ConfirmModal, Field, Input, Menu, MenuDivider,
   MenuItem, Modal, Select, Textarea, toast,
 } from "../components/ui";
 import {
-  PRIORITIES, STATUSES,
+  EDITABLE_STATUSES, PRIORITIES, STATUSES,
   priorityTone, statusTone, type Priority, type Task, type TaskStatus,
 } from "../data/demo";
-import { createTask, deleteTaskEverywhere, editTask, setTaskStatus, useTasks } from "../store/tasks";
+import { createTask, deleteTaskEverywhere, displayStatus, editTask, setTaskStatus, useTasks } from "../store/tasks";
 import { hydrateClients, useClients } from "../store/clients";
 import { hydrateEmployees, useEmployees } from "../store/employees";
 
@@ -21,7 +21,7 @@ const columns: { status: TaskStatus; dot: string; ring: string }[] = [
   { status: "Новая", dot: "bg-violet-500", ring: "ring-violet-300 bg-violet-50/60" },
   { status: "В работе", dot: "bg-brand-500", ring: "ring-brand-300 bg-brand-50/60" },
   { status: "Выполнена", dot: "bg-emerald-500", ring: "ring-emerald-300 bg-emerald-50/60" },
-  { status: "Отменена", dot: "bg-slate-400", ring: "ring-slate-300 bg-slate-100/80" },
+  { status: "Архив", dot: "bg-slate-400", ring: "ring-slate-300 bg-slate-100/80" },
 ];
 
 const prioBorder: Record<Priority, string> = {
@@ -32,7 +32,7 @@ const prioBorder: Record<Priority, string> = {
 };
 
 function isOverdue(t: Task): boolean {
-  if (t.status === "Выполнена" || t.status === "Отменена") return false;
+  if (t.status === "Выполнена") return false;
   const m = t.due.match(/^(\d{2})\.(\d{2})/);
   if (!m) return false;
   const now = new Date();
@@ -124,7 +124,7 @@ function TaskFormModal({
         <div className="grid grid-cols-3 gap-4 max-sm:grid-cols-1">
           <Field label="Статус">
             <Select value={status} onChange={(e) => setStatus(e.target.value as TaskStatus)}>
-              {STATUSES.map((s) => <option key={s}>{s}</option>)}
+              {EDITABLE_STATUSES.map((s) => <option key={s}>{s}</option>)}
             </Select>
           </Field>
           <Field label="Приоритет">
@@ -155,7 +155,7 @@ function TaskViewModal({
     <Modal open onClose={onClose} title={`Задача № ${task.id}`} wide
       footer={
         <>
-          {task.status !== "Выполнена" && task.status !== "Отменена" && (
+          {task.status !== "Выполнена" && (
             <button
               onClick={() => { setTaskStatus(task.id, "Выполнена"); toast("Статус обновлён — задача выполнена"); onClose(); }}
               className="mr-auto flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-[13px] font-medium text-white hover:bg-emerald-700">
@@ -173,7 +173,7 @@ function TaskViewModal({
         </>
       }>
       <div className="mb-3 flex flex-wrap gap-2">
-        <Badge tone={statusTone[task.status]}>{task.status}</Badge>
+        <Badge tone={statusTone[displayStatus(task)]}>{displayStatus(task)}</Badge>
         <Badge tone={priorityTone[task.priority]}>{task.priority} приоритет</Badge>
         {src && <Badge tone="cyan">{src}</Badge>}
         {isOverdue(task) && <Badge tone="red">просрочена</Badge>}
@@ -224,7 +224,9 @@ export default function Tasks() {
   const dragTask = dragId != null ? tasks.find((t) => t.id === dragId) : null;
 
   const onDrop = (status: TaskStatus) => {
-    if (dragTask && dragTask.status !== status) {
+    if (status === "Архив") {
+      toast("В архив задачи попадают автоматически — через 24ч после выполнения");
+    } else if (dragTask && dragTask.status !== status) {
       setTaskStatus(dragTask.id, status);
       toast(`«${dragTask.title.slice(0, 40)}${dragTask.title.length > 40 ? "…" : ""}» → ${status}`);
     }
@@ -276,7 +278,7 @@ export default function Tasks() {
       {view === "kanban" && (
         <div className="grid grid-cols-4 items-start gap-3.5 overflow-x-auto pb-2 max-xl:grid-cols-[repeat(4,270px)]">
           {columns.map(({ status, dot, ring }) => {
-            const items = tasks.filter((t) => t.status === status);
+            const items = tasks.filter((t) => displayStatus(t) === status);
             const isOver = overCol === status && dragTask?.status !== status;
             return (
               <div key={status}
@@ -289,10 +291,12 @@ export default function Tasks() {
                   <span className={`size-2 rounded-full ${dot}`} />
                   {status}
                   <span className="rounded-full bg-white px-2 py-px text-[11px] font-semibold text-slate-400 shadow-sm">{items.length}</span>
-                  <button onClick={() => openCreate(status)}
-                    className="ml-auto rounded-md p-1 text-slate-400 transition hover:bg-white hover:text-slate-700" title="Добавить сюда">
-                    <Plus className="size-3.5" />
-                  </button>
+                  {status !== "Архив" && (
+                    <button onClick={() => openCreate(status)}
+                      className="ml-auto rounded-md p-1 text-slate-400 transition hover:bg-white hover:text-slate-700" title="Добавить сюда">
+                      <Plus className="size-3.5" />
+                    </button>
+                  )}
                 </div>
                 <div className="space-y-2">
                   {items.map((t) => {
@@ -309,8 +313,8 @@ export default function Tasks() {
                         <div className="mt-1 truncate text-xs text-slate-400">{t.client}</div>
                         <div className="mt-2.5 flex items-center justify-between">
                           <span className={`flex items-center gap-1.5 text-[11px] ${isOverdue(t) ? "font-semibold text-red-500" : "text-slate-400"}`}>
-                            {status === "Выполнена" ? <Check className="size-3 text-emerald-500" />
-                              : status === "Отменена" ? <X className="size-3" />
+                            {status === "Архив" ? <Archive className="size-3" />
+                              : status === "Выполнена" ? <Check className="size-3 text-emerald-500" />
                               : <Calendar className="size-3" />}
                             {t.due}
                             {src === "из Telegram" && <Send className="size-3 text-cyan-500" />}
@@ -380,16 +384,21 @@ export default function Tasks() {
                         <span className="flex items-center gap-2"><Avatar name={t.assignee} className="!size-6 !text-[10px]" />{t.assignee}</span>
                       </td>
                       <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                        <select
-                          value={t.status}
-                          onChange={(e) => { setTaskStatus(t.id, e.target.value as TaskStatus); toast("Статус обновлён — клиент уведомлён"); }}
-                          className={`cursor-pointer rounded-full border py-1 pr-7 pl-3 text-xs font-medium focus:outline-none ${
-                            { "Новая": "border-violet-200 bg-violet-50 text-violet-700",
-                              "В работе": "border-brand-200 bg-brand-50 text-brand-700",
-                              "Выполнена": "border-emerald-200 bg-emerald-50 text-emerald-700",
-                              "Отменена": "border-slate-200 bg-slate-100 text-slate-500" }[t.status]}`}>
-                          {STATUSES.map((s) => <option key={s}>{s}</option>)}
-                        </select>
+                        {displayStatus(t) === "Архив" ? (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-100 py-1 pr-3 pl-3 text-xs font-medium text-slate-500">
+                            Архив
+                          </span>
+                        ) : (
+                          <select
+                            value={t.status}
+                            onChange={(e) => { setTaskStatus(t.id, e.target.value as TaskStatus); toast("Статус обновлён — клиент уведомлён"); }}
+                            className={`cursor-pointer rounded-full border py-1 pr-7 pl-3 text-xs font-medium focus:outline-none ${
+                              { "Новая": "border-violet-200 bg-violet-50 text-violet-700",
+                                "В работе": "border-brand-200 bg-brand-50 text-brand-700",
+                                "Выполнена": "border-emerald-200 bg-emerald-50 text-emerald-700" }[t.status as "Новая" | "В работе" | "Выполнена"]}`}>
+                            {EDITABLE_STATUSES.map((s) => <option key={s}>{s}</option>)}
+                          </select>
+                        )}
                       </td>
                       <td className="px-4 py-3"><Badge tone={priorityTone[t.priority]}>{t.priority}</Badge></td>
                       <td className={`px-4 py-3 whitespace-nowrap ${isOverdue(t) ? "font-semibold text-red-600" : ""}`}>{t.due}</td>
@@ -401,8 +410,8 @@ export default function Tasks() {
                         }>
                           <MenuItem icon={<ExternalLink className="size-4" />} onClick={() => setViewTask(t)}>Открыть</MenuItem>
                           <MenuItem icon={<Pencil className="size-4" />} onClick={() => openEdit(t)}>Изменить</MenuItem>
-                          {t.status === "Отменена" ? (
-                            <MenuItem icon={<RotateCcw className="size-4" />} onClick={() => { setTaskStatus(t.id, "Новая"); toast("Задача возобновлена — статус «Новая»"); }}>Возобновить</MenuItem>
+                          {displayStatus(t) === "Архив" ? (
+                            <MenuItem icon={<RotateCcw className="size-4" />} onClick={() => { setTaskStatus(t.id, "В работе"); toast("Задача возобновлена — статус «В работе»"); }}>Возобновить</MenuItem>
                           ) : t.status !== "Выполнена" && (
                             <MenuItem icon={<Check className="size-4" />} onClick={() => { setTaskStatus(t.id, "Выполнена"); toast("Задача отмечена выполненной"); }}>Выполнена</MenuItem>
                           )}
