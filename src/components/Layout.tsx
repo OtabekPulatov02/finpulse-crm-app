@@ -11,6 +11,7 @@ import { resetEmployeesStore } from "../store/employees";
 import { resetCalendarEventsStore } from "../store/calendarEvents";
 import { clearSession, ROLE_LABEL, useSession } from "../auth";
 import { formatPhone } from "../lib/phone";
+import { BrandMark } from "./BrandMark";
 
 const ALL_NAV = [
   { to: "/dashboard", label: "Дашборд", icon: LayoutDashboard, hideFor: ["client"] as string[] },
@@ -33,9 +34,7 @@ function SidebarNav({
   return (
     <>
       <div className="flex items-center gap-2.5 px-5 pt-5 pb-4">
-        <div className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-600 to-indigo-600 text-base font-extrabold text-white">
-          F
-        </div>
+        <BrandMark className="size-9" />
         <div className="text-base font-bold tracking-tight">
           fin<span className="text-red-500">pulse</span>
           <span className="ml-1 text-xs font-semibold text-slate-400">CRM</span>
