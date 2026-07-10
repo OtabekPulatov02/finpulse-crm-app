@@ -17,6 +17,11 @@ export const priorityTone: Record<Priority, Tone> = {
   "Низкий": "gray", "Средний": "blue", "Высокий": "yellow", "Критический": "red",
 };
 
+export interface TaskAttachment {
+  index: number;
+  kind: "photo" | "document" | "video" | "voice" | "audio";
+}
+
 export interface Task {
   id: number;
   title: string;
@@ -33,5 +38,6 @@ export interface Task {
   fromCalendar?: boolean;
   description?: string;
   created?: string;
+  attachments?: TaskAttachment[];
 }
 

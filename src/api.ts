@@ -20,6 +20,11 @@ function authHeaders(): Record<string, string> {
 
 export type BotStatus = "new" | "in_progress" | "done";
 
+export interface TaskAttachment {
+  index: number;
+  kind: "photo" | "document" | "video" | "voice" | "audio";
+}
+
 export interface BotTask {
   num: number;
   company: string;
@@ -28,6 +33,7 @@ export interface BotTask {
   assignee: string | null;
   createdAt: string | null;
   files: number;
+  attachments?: TaskAttachment[];
   dueDate?: string | null;
   source?: "bot" | "crm";
   doneAt?: string | null;
@@ -178,6 +184,22 @@ export const attachTaskFileRequest = async (num: number, file: File) => {
     action: "task_attach_file", num, filename: file.name, mimeType: file.type, dataBase64,
   });
 };
+
+/* Открывает вложение задачи в новой вкладке: заголовки авторизации нельзя
+   передать через обычную ссылку/img, поэтому скачиваем как Blob через
+   fetch с authHeaders(), затем открываем через object URL. */
+export async function openTaskFile(num: number, index: number): Promise<void> {
+  const r = await fetch(`${API}?r=task_file&num=${num}&i=${index}`, {
+    headers: authHeaders(),
+    signal: AbortSignal.timeout(20000),
+  });
+  if (r.status === 401) { clearSession(); return; }
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  const blob = await r.blob();
+  const url = URL.createObjectURL(blob);
+  window.open(url, "_blank");
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
 
 export const fetchCalendar = () =>
   get<{ ok: boolean; calendar: CalendarEntry[] }>("r=calendar").then((d) => d.calendar ?? []);
