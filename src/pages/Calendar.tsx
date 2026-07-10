@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { Badge, Card, CardHeader, ConfirmModal, Modal, toast } from "../components/ui";
 import { useTasks } from "../store/tasks";
 import { hydrateClients, useClients } from "../store/clients";
-import { createCalendarEvent, editCalendarEvent, hydrateCalendarEvents, removeCalendarEvent, useCalendarEvents } from "../store/calendarEvents";
+import { createCalendarEvent, hydrateCalendarEvents, removeCalendarEvent, useCalendarEvents } from "../store/calendarEvents";
 import type { CalendarEventEntry } from "../api";
 import { formatSumsInText } from "../lib/amount";
 
@@ -12,7 +12,6 @@ type EvType = "tax" | "pay" | "task";
 interface Ev {
   key: string; date: Date; type: EvType; title: string; company: string;
   repeat: string; remindDays: number | null; id?: string; taskNum?: number;
-  status?: CalendarEventEntry["status"];
 }
 
 const MONTHS = ["январь","февраль","март","апрель","май","июнь","июль","август","сентябрь","октябрь","ноябрь","декабрь"];
@@ -39,14 +38,6 @@ const REPEAT_VALUE: Record<string, CalendarEventEntry["repeat"]> = {
 };
 const REMIND_VALUE: Record<string, number> = {
   "в день события": 0, "за 1 день": 1, "за 3 дня": 3, "за неделю": 7,
-};
-const CE_STATUS_LABEL: Record<CalendarEventEntry["status"], string> = {
-  new: "Новая", in_progress: "В работе", done: "Выполнено",
-};
-const CE_STATUS_TONE: Record<CalendarEventEntry["status"], string> = {
-  new: "bg-violet-50 text-violet-600 border-violet-200",
-  in_progress: "bg-brand-50 text-brand-600 border-brand-200",
-  done: "bg-emerald-50 text-emerald-600 border-emerald-200",
 };
 
 const sameDay = (a: Date, b: Date) =>
@@ -76,7 +67,6 @@ export default function Calendar() {
         key: "ce:" + e.id, date: parseISODate(e.date), type: e.type,
         title: e.title, company: e.company || "Все клиенты",
         repeat: REPEAT_LABEL[e.repeat], remindDays: e.remindDays, id: e.id,
-        status: e.status,
       }));
     return [...fromTasks, ...fromEvents];
   }, [tasks, calendarEvents]);
@@ -233,34 +223,17 @@ export default function Calendar() {
                     <div className="text-[13.5px] font-semibold">{e.title}</div>
                     <div className="text-xs text-slate-400">{typeName[e.type]} · {e.company}{e.repeat && ` · 🔁 ${e.repeat.toLowerCase()}`}</div>
                   </div>
-                  <div className="flex shrink-0 flex-col items-end gap-1.5">
+                  <div className="flex shrink-0 gap-1.5">
                     {e.type === "task" ? (
                       <button onClick={() => { setDay(null); navigate(`/tasks?open=${e.taskNum}`); }}
                         className="flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium hover:bg-slate-50">
                         <ExternalLink className="size-3.5" />Открыть задачу
                       </button>
                     ) : (
-                      <>
-                        <select
-                          value={e.status ?? "new"}
-                          onChange={(ev2) => {
-                            if (!e.id) return;
-                            const status = ev2.target.value as CalendarEventEntry["status"];
-                            void editCalendarEvent(e.id, { status }).then((r) => {
-                              if (!r.ok) toast(r.error || "Не удалось изменить статус");
-                            });
-                          }}
-                          className={`rounded-lg border px-2 py-1 text-[11px] font-medium ${CE_STATUS_TONE[e.status ?? "new"]}`}
-                        >
-                          {(Object.keys(CE_STATUS_LABEL) as CalendarEventEntry["status"][]).map((s) => (
-                            <option key={s} value={s}>{CE_STATUS_LABEL[s]}</option>
-                          ))}
-                        </select>
-                        <button onClick={() => setDeleteEv(e)}
-                          className="flex items-center gap-1 rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50">
-                          <Trash2 className="size-3.5" />Удалить
-                        </button>
-                      </>
+                      <button onClick={() => setDeleteEv(e)}
+                        className="flex items-center gap-1 rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50">
+                        <Trash2 className="size-3.5" />Удалить
+                      </button>
                     )}
                   </div>
                 </div>

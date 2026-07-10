@@ -61,8 +61,7 @@ export async function removeCalendarEvent(id: string) {
 
 export async function editCalendarEvent(id: string, patch: Partial<{
   title: string; company: string | null; date: string;
-  repeat: CalendarEventEntry["repeat"]; remindDays: number;
-  status: CalendarEventEntry["status"]; active: boolean;
+  repeat: CalendarEventEntry["repeat"]; remindDays: number; active: boolean;
 }>) {
   const r = await updateCalendarEventRequest(id, patch);
   if (r.ok && r.event) {

@@ -6,7 +6,7 @@ import {
 import { Link } from "react-router-dom";
 import { Avatar, Badge, Card, CardHeader, toast } from "../components/ui";
 import { priorityTone, type Task } from "../data/demo";
-import { displayStatus, isLiveTask, isOverdue, setTaskStatus, useTasks } from "../store/tasks";
+import { displayStatus, isOverdue, setTaskStatus, useTasks } from "../store/tasks";
 import { useClients } from "../store/clients";
 import { hydrateEmployees, useEmployees } from "../store/employees";
 
@@ -76,11 +76,6 @@ export default function Dashboard() {
     .sort((a, b) => Number(a.status === "Выполнена") - Number(b.status === "Выполнена"))
     .slice(0, 5);
 
-  const requests = tasks
-    .filter((t) => t.fromBot && isLiveTask(t.id) && displayStatus(t) !== "Архив")
-    .slice(0, 3)
-    .map((t) => ({ from: t.client, time: t.created ?? "", msg: t.description ?? t.title }));
-
   const donutData = ["Новая", "В работе", "Выполнена", "Архив"].map((label) => ({
     label,
     n: tasks.filter((t) => displayStatus(t) === label).length,
@@ -148,33 +143,6 @@ export default function Dashboard() {
               </div>
             ) : (
               <p className="px-5 py-8 text-center text-sm text-slate-400">Нет открытых задач — можно перевести дух.</p>
-            )}
-          </Card>
-
-          <Card>
-            <CardHeader title="Новые обращения из Telegram" action={
-              requests.length ? <span className="flex items-center gap-1.5 text-xs text-emerald-600"><span className="size-1.5 animate-pulse rounded-full bg-emerald-500" />живые данные бота</span> : undefined
-            } />
-            {requests.length ? (
-              <div className="divide-y divide-slate-100">
-                {requests.map((r, i) => (
-                  <div key={i} className="flex items-center gap-3 px-5 py-3">
-                    <Avatar name={r.from.replace(/^(ООО|АО|ИП|MCHJ)\s*«?/, "")} />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-baseline justify-between gap-3">
-                        <span className="truncate text-[13.5px] font-semibold">{r.from}</span>
-                        <span className="shrink-0 text-[11px] text-slate-400">{r.time}</span>
-                      </div>
-                      <div className="truncate text-xs text-slate-400">{r.msg}</div>
-                    </div>
-                    <Link to="/tasks" className="shrink-0 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium hover:bg-slate-50">
-                      Создать задачу
-                    </Link>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="px-5 py-8 text-center text-sm text-slate-400">Новых обращений из Telegram пока нет.</p>
             )}
           </Card>
 
