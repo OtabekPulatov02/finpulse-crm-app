@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   Archive, Calendar, Check, ExternalLink, Hash, Kanban, LayoutList, MoreHorizontal,
-  Pencil, Plus, RotateCcw, Search, Send, Trash2,
+  Paperclip, Pencil, Plus, RotateCcw, Search, Send, Trash2, X,
 } from "lucide-react";
 import {
   Avatar, Badge, Card, ConfirmModal, Field, Input, Menu, MenuDivider,
@@ -15,7 +15,7 @@ import {
 import { createTask, deleteTaskEverywhere, displayStatus, editTask, isOverdue, setTaskStatus, useTasks } from "../store/tasks";
 import { hydrateClients, useClients } from "../store/clients";
 import { hydrateEmployees, useEmployees } from "../store/employees";
-import { fetchLogs } from "../api";
+import { attachTaskFileRequest, fetchLogs } from "../api";
 import { mapLog, type LogView } from "../lib/logs";
 
 /* ---------------- Вспомогательное ---------------- */
@@ -59,7 +59,10 @@ function TaskFormModal({
   const [priority, setPriority] = useState<Priority>(task?.priority ?? "Средний");
   const [dueDate, setDueDate] = useState(task?.dueDate ?? "");
   const [description, setDescription] = useState(task?.description ?? "");
+  const [file, setFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [saving, setSaving] = useState(false);
+  useEffect(() => { setFile(null); }, [task, open]);
 
   const submit = async () => {
     if (!title.trim()) { toast("Укажите название задачи"); return; }
@@ -68,6 +71,7 @@ function TaskFormModal({
     const clientId = clients.find((c) => c.company === client)?.id ?? null;
     setSaving(true);
     try {
+      let targetId: number | undefined = task?.id;
       if (task) {
         const r = await editTask(task.id, {
           title, client, assignee: assigneeFinal, dueDate: dueDate || null, description, status,
@@ -79,7 +83,12 @@ function TaskFormModal({
           title, client, clientId, assignee: assigneeFinal, priority, dueDate: dueDate || null, description,
         });
         if (!r.ok) { toast(r.error || "Не удалось создать задачу"); return; }
+        targetId = r.id;
         toast(assignee === "auto" ? "Задача создана и распределена автоматически" : "Задача создана и назначена исполнителю");
+      }
+      if (file && targetId) {
+        const fr = await attachTaskFileRequest(targetId, file);
+        if (!fr.ok) toast(fr.error || "Задача сохранена, но файл прикрепить не удалось");
       }
       onClose();
     } finally {
@@ -133,6 +142,26 @@ function TaskFormModal({
         </div>
         <Field label="Описание">
           <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Описание задачи" />
+        </Field>
+        <Field label="Файл или фото (необязательно)">
+          <input ref={fileInputRef} type="file" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" className="hidden"
+            onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+          {!file ? (
+            <button type="button" onClick={() => fileInputRef.current?.click()}
+              className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-slate-300 px-3 py-2.5 text-[13px] font-medium text-slate-500 hover:border-brand-400 hover:text-brand-600">
+              <Paperclip className="size-4" /> Прикрепить файл
+            </button>
+          ) : (
+            <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[13px]">
+              <span className="flex min-w-0 items-center gap-2">
+                <Paperclip className="size-3.5 shrink-0 text-slate-400" />
+                <span className="truncate">{file.name}</span>
+              </span>
+              <button type="button" onClick={() => setFile(null)} className="shrink-0 rounded p-0.5 text-slate-400 hover:text-slate-700">
+                <X className="size-3.5" />
+              </button>
+            </div>
+          )}
         </Field>
       </div>
     </Modal>

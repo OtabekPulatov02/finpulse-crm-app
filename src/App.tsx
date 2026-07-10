@@ -19,13 +19,13 @@ export default function App() {
       <Route path="/login" element={<Login />} />
 
       <Route element={<RequireAuth />}>
-        <Route element={<RequireClientArea />}>
-          <Route path="/client" element={<ClientTasks />} />
-          <Route path="/client/profile" element={<ClientProfile />} />
-        </Route>
+        <Route element={<Layout />}>
+          <Route element={<RequireClientArea />}>
+            <Route path="/client" element={<ClientTasks />} />
+            <Route path="/client/profile" element={<ClientProfile />} />
+          </Route>
 
-        <Route element={<RequireStaffArea />}>
-          <Route element={<Layout />}>
+          <Route element={<RequireStaffArea />}>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/tasks" element={<Tasks />} />

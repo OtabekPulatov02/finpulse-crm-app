@@ -34,6 +34,10 @@ function ClientFormModal({
   const [tariff, setTariff] = useState(client?.tariff ?? TARIFFS[0]);
   const [assignedTo, setAssignedTo] = useState(client?.assignedTo ?? employeeNames[0] ?? "");
   const [note, setNote] = useState(client?.note ?? "");
+  const [inn, setInn] = useState(client?.inn ?? "");
+  const [mfo, setMfo] = useState(client?.mfo ?? "");
+  const [bankAccount, setBankAccount] = useState(client?.bankAccount ?? "");
+  const [address, setAddress] = useState(client?.address ?? "");
   const [saving, setSaving] = useState(false);
 
   const submit = async () => {
@@ -41,7 +45,10 @@ function ClientFormModal({
     setSaving(true);
     try {
       if (edit && client) {
-        const r = await patchClient(client.id, { position: position || null, tariff: tariff || null, assignedTo: assignedTo || null, note: note || null });
+        const r = await patchClient(client.id, {
+          position: position || null, tariff: tariff || null, assignedTo: assignedTo || null, note: note || null,
+          inn: inn || null, mfo: mfo || null, bankAccount: bankAccount || null, address: address || null,
+        });
         if (!r.ok) { toast(r.error || "Не удалось сохранить изменения"); return; }
         toast("Данные клиента обновлены");
       } else {
@@ -87,6 +94,19 @@ function ClientFormModal({
           </Field>
         </div>
         <Field label="Комментарий"><Textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Комментарий" /></Field>
+        {edit && (
+          <>
+            <div className="pt-1 text-[13px] font-semibold text-slate-500">Реквизиты компании</div>
+            <div className="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
+              <Field label="ИНН"><Input value={inn} onChange={(e) => setInn(e.target.value)} placeholder="123456789" /></Field>
+              <Field label="МФО"><Input value={mfo} onChange={(e) => setMfo(e.target.value)} placeholder="00014" /></Field>
+            </div>
+            <div className="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
+              <Field label="Расчётный счёт"><Input value={bankAccount} onChange={(e) => setBankAccount(e.target.value)} placeholder="2020 8000 ..." /></Field>
+              <Field label="Юридический адрес"><Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="г. Ташкент, ..." /></Field>
+            </div>
+          </>
+        )}
       </div>
     </Modal>
   );

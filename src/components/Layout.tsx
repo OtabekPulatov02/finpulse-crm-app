@@ -12,13 +12,15 @@ import { resetCalendarEventsStore } from "../store/calendarEvents";
 import { clearSession, ROLE_LABEL, useSession } from "../auth";
 
 const ALL_NAV = [
-  { to: "/dashboard", label: "Дашборд", icon: LayoutDashboard, hideFor: [] as string[] },
-  { to: "/tasks", label: "Задачи", icon: ListTodo, count: true, hideFor: [] as string[] },
-  { to: "/calendar", label: "Календарь", icon: CalendarDays, hideFor: [] as string[] },
-  { to: "/clients", label: "Клиенты", icon: Building2, hideFor: [] as string[] },
-  { to: "/employees", label: "Сотрудники", icon: Users, hideFor: ["accountant", "guest"] },
-  { to: "/analytics", label: "Аналитика", icon: BarChart3, hideFor: [] as string[] },
-  { to: "/settings", label: "Настройки", icon: Settings, hideFor: ["accountant", "guest"] },
+  { to: "/dashboard", label: "Дашборд", icon: LayoutDashboard, hideFor: ["client"] as string[] },
+  { to: "/tasks", label: "Задачи", icon: ListTodo, count: true, hideFor: ["client"] as string[] },
+  { to: "/calendar", label: "Календарь", icon: CalendarDays, hideFor: ["client"] as string[] },
+  { to: "/clients", label: "Клиенты", icon: Building2, hideFor: ["client"] as string[] },
+  { to: "/employees", label: "Сотрудники", icon: Users, hideFor: ["accountant", "guest", "client"] },
+  { to: "/analytics", label: "Аналитика", icon: BarChart3, hideFor: ["client"] as string[] },
+  { to: "/settings", label: "Настройки", icon: Settings, hideFor: ["accountant", "guest", "client"] },
+  { to: "/client", label: "Мои задачи", icon: ListTodo, hideFor: ["admin", "accountant", "guest"] as string[] },
+  { to: "/client/profile", label: "Профиль", icon: User, hideFor: ["admin", "accountant", "guest"] as string[] },
 ];
 
 function SidebarNav({
@@ -59,7 +61,7 @@ function SidebarNav({
             )}
           </NavLink>
         ))}
-        {role !== "guest" && (
+        {role !== "guest" && role !== "client" && (
           <>
             <div className="mt-4 mb-1 px-3 text-[11px] font-semibold tracking-wider text-slate-400 uppercase">
               Интеграции
@@ -294,11 +296,14 @@ export default function Layout() {
                 <ChevronDown className="size-3.5 text-slate-400" />
               </button>
             }>
-              {role !== "guest" && role !== "accountant" && (
+              {role === "admin" && (
                 <MenuItem icon={<User className="size-4" />} onClick={() => navigate("/employees")}>Мой профиль</MenuItem>
               )}
-              {role !== "guest" && role !== "accountant" && (
+              {role === "admin" && (
                 <MenuItem icon={<Settings className="size-4" />} onClick={() => navigate("/settings")}>Настройки</MenuItem>
+              )}
+              {role === "client" && (
+                <MenuItem icon={<User className="size-4" />} onClick={() => navigate("/client/profile")}>Профиль</MenuItem>
               )}
               <MenuDivider />
               <MenuItem danger icon={<LogOut className="size-4" />} onClick={logout}>Выйти</MenuItem>
