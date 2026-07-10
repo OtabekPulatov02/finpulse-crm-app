@@ -276,6 +276,7 @@ export interface CalendarEventEntry {
   repeat: "once" | "monthly" | "quarterly" | "yearly";
   remindDays: number;
   active: boolean;
+  status: "new" | "in_progress" | "done";
   createdAt?: string | null;
 }
 
@@ -291,6 +292,12 @@ export const createCalendarEventRequest = (data: {
 
 export const deleteCalendarEventRequest = (id: string) =>
   post<{ ok: boolean; error?: string }>({ action: "calendar_event_delete", id });
+
+export const updateCalendarEventRequest = (id: string, patch: Partial<{
+  title: string; company: string | null; date: string;
+  repeat: CalendarEventEntry["repeat"]; remindDays: number;
+  status: CalendarEventEntry["status"]; active: boolean;
+}>) => post<CalendarEventResult>({ action: "calendar_event_update", id, patch });
 
 export function fmtTs(ts?: string | null): string {
   if (!ts) return "—";
