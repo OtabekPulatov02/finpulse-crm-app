@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from "react";
 import {
-  createCalendarEventRequest, deleteCalendarEventRequest, fetchCalendarEvents, type CalendarEventEntry,
+  createCalendarEventRequest, deleteCalendarEventRequest, fetchCalendarEvents, updateCalendarEventRequest,
+  type CalendarEventEntry,
 } from "../api";
 
 let events: CalendarEventEntry[] = [];
@@ -53,6 +54,19 @@ export async function removeCalendarEvent(id: string) {
   const r = await deleteCalendarEventRequest(id);
   if (r.ok) {
     events = events.filter((e) => e.id !== id);
+    emit();
+  }
+  return r;
+}
+
+export async function editCalendarEvent(id: string, patch: Partial<{
+  title: string; company: string | null; date: string;
+  repeat: CalendarEventEntry["repeat"]; remindDays: number;
+  status: CalendarEventEntry["status"]; active: boolean;
+}>) {
+  const r = await updateCalendarEventRequest(id, patch);
+  if (r.ok && r.event) {
+    events = events.map((e) => (e.id === id ? r.event! : e));
     emit();
   }
   return r;
