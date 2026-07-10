@@ -68,7 +68,12 @@ function TaskFormModal({
   const submit = async () => {
     if (!title.trim()) { toast("Укажите название задачи"); return; }
     if (!client) { toast("Выберите клиента"); return; }
-    const assigneeFinal = assignee === "auto" ? (employeeNames[0] ?? "не назначен") : assignee;
+    /* "auto" передаём как есть — сам API/стор превращает его в "без
+       исполнителя" (assignee: undefined), чтобы задача осталась в статусе
+       "Новая" до тех пор, пока кто-то реально не возьмёт её в работу.
+       Раньше здесь подставлялся первый сотрудник из списка, из-за чего
+       любая новая задача сразу считалась "в работе". */
+    const assigneeFinal = assignee;
     const clientId = clients.find((c) => c.company === client)?.id ?? null;
     setSaving(true);
     try {
@@ -85,7 +90,7 @@ function TaskFormModal({
         });
         if (!r.ok) { toast(r.error || "Не удалось создать задачу"); return; }
         targetId = r.id;
-        toast(assignee === "auto" ? "Задача создана и распределена автоматически" : "Задача создана и назначена исполнителю");
+        toast(assignee === "auto" ? "Задача создана" : "Задача создана и назначена исполнителю");
       }
       if (file && targetId) {
         const fr = await attachTaskFileRequest(targetId, file);
@@ -121,7 +126,7 @@ function TaskFormModal({
           </Field>
           <Field label="Исполнитель">
             <Select value={assignee} onChange={(e) => setAssignee(e.target.value)}>
-              {!task && <option value="auto">Назначить автоматически</option>}
+              {!task && <option value="auto">Без исполнителя (статус «Новая»)</option>}
               {employeeNames.map((c) => <option key={c}>{c}</option>)}
             </Select>
           </Field>
