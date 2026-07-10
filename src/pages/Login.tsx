@@ -73,12 +73,8 @@ export default function Login() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
       <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
-        <div className="mb-6 flex items-center gap-2.5">
-          <BrandMark className="size-9" />
-          <div className="text-base font-bold tracking-tight">
-            fin<span className="text-red-500">pulse</span>
-            <span className="ml-1 text-xs font-semibold text-slate-400">CRM</span>
-          </div>
+        <div className="mb-6 flex items-center">
+          <BrandMark className="h-14" />
         </div>
 
         <h1 className="mb-5 text-lg font-semibold">Вход в систему</h1>

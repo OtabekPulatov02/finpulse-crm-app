@@ -33,12 +33,8 @@ function SidebarNav({
 }) {
   return (
     <>
-      <div className="flex items-center gap-2.5 px-5 pt-5 pb-4">
-        <BrandMark className="size-9" />
-        <div className="text-base font-bold tracking-tight">
-          fin<span className="text-red-500">pulse</span>
-          <span className="ml-1 text-xs font-semibold text-slate-400">CRM</span>
-        </div>
+      <div className="flex items-center px-5 pt-5 pb-4">
+        <BrandMark className="h-12" />
       </div>
       <nav className="flex flex-1 flex-col gap-0.5 px-3 py-2">
         {nav.map(({ to, label, icon: Icon, count, end }) => (
