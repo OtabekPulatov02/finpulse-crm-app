@@ -6,6 +6,7 @@ import { resetTasksStore } from "../store/tasks";
 import { resetClientsStore } from "../store/clients";
 import { resetEmployeesStore } from "../store/employees";
 import { resetCalendarEventsStore } from "../store/calendarEvents";
+import { BrandMark } from "../components/BrandMark";
 
 export default function Login() {
   const [identity, setIdentity] = useState("");
@@ -73,9 +74,7 @@ export default function Login() {
     <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
       <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
         <div className="mb-6 flex items-center gap-2.5">
-          <div className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-600 to-indigo-600 text-base font-extrabold text-white">
-            F
-          </div>
+          <BrandMark className="size-9" />
           <div className="text-base font-bold tracking-tight">
             fin<span className="text-red-500">pulse</span>
             <span className="ml-1 text-xs font-semibold text-slate-400">CRM</span>
