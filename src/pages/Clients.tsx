@@ -10,6 +10,7 @@ import {
 import { useEmployees, hydrateEmployees } from "../store/employees";
 import type { CrmClient } from "../api";
 import { createClient, hydrateClients, patchClient, removeClient, useClients } from "../store/clients";
+import { formatPhone } from "../lib/phone";
 
 const STATUS_LABEL: Record<string, string> = {
   active: "Активный", pending: "Ожидает активации", archived: "В архиве",
@@ -29,7 +30,7 @@ function ClientFormModal({
   const employeeNames = employees.filter((e) => e.active).map((e) => e.name);
   const edit = !!client;
   const [company, setCompany] = useState(client?.company ?? "");
-  const [phone, setPhone] = useState(client?.phone ?? "");
+  const [phone, setPhone] = useState(edit ? formatPhone(client?.phone ?? "") : "");
   const [position, setPosition] = useState(client?.position ?? "");
   const [tariff, setTariff] = useState(client?.tariff ?? TARIFFS[0]);
   const [assignedTo, setAssignedTo] = useState(client?.assignedTo ?? employeeNames[0] ?? "");
@@ -185,7 +186,7 @@ export default function Clients() {
                     <div className="font-semibold">{c.company}</div>
                     {c.position && <div className="text-xs text-slate-400">{c.position}</div>}
                   </td>
-                  <td className="px-4 py-3">{c.phone || "—"}</td>
+                  <td className="px-4 py-3">{c.phone ? formatPhone(c.phone) : "—"}</td>
                   <td className="px-4 py-3">
                     {!c.assignedTo ? (
                       <span className="text-slate-400">не назначен</span>

@@ -3,6 +3,7 @@ import {
   Banknote, Building2, CheckCircle2, Clock3, Hash, KeyRound, ListTodo, MapPin, Phone, ShieldCheck,
 } from "lucide-react";
 import { Badge, toast, type Tone } from "../components/ui";
+import { formatPhone } from "../lib/phone";
 import {
   changePasswordRequest, fetchBotTasks, fetchClients, type BotTask, type CrmClient,
 } from "../api";
@@ -47,7 +48,7 @@ function CompanyTab({ client }: { client: CrmClient | null }) {
         <Badge tone={STATUS_TONE[client.status] ?? "gray"}>{STATUS_LABEL[client.status] ?? client.status}</Badge>
       </div>
       <div className="divide-y divide-slate-100">
-        <InfoRow icon={Phone} label="Телефон" value={client.phone ?? ""} />
+        <InfoRow icon={Phone} label="Телефон" value={formatPhone(client.phone)} />
         <InfoRow icon={Building2} label="Должность контакта" value={client.position ?? ""} />
         <InfoRow icon={ShieldCheck} label="Тариф" value={client.tariff ?? ""} />
         <InfoRow icon={Hash} label="ИНН" value={client.inn ?? ""} />

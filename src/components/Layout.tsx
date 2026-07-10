@@ -10,6 +10,7 @@ import { hydrateClients, resetClientsStore, useClients } from "../store/clients"
 import { resetEmployeesStore } from "../store/employees";
 import { resetCalendarEventsStore } from "../store/calendarEvents";
 import { clearSession, ROLE_LABEL, useSession } from "../auth";
+import { formatPhone } from "../lib/phone";
 
 const ALL_NAV = [
   { to: "/dashboard", label: "Дашборд", icon: LayoutDashboard, hideFor: ["client"] as string[] },
@@ -228,7 +229,7 @@ export default function Layout() {
                             <Avatar name={c.company.replace(/^(ООО|АО|ИП|MCHJ|OOO)\s*«?/, "")} />
                             <div className="min-w-0">
                               <div className="truncate text-[13px] font-medium">{c.company}</div>
-                              <div className="truncate text-[11px] text-slate-400">{c.phone ?? "без телефона"}</div>
+                              <div className="truncate text-[11px] text-slate-400">{c.phone ? formatPhone(c.phone) : "без телефона"}</div>
                             </div>
                           </button>
                         ))}
