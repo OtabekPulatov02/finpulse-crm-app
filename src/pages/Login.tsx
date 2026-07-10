@@ -25,7 +25,13 @@ export default function Login() {
     try {
       const res = await loginRequest(identity.trim(), password);
       if (!res.ok || !res.token || !res.role) {
-        setError(res.error === "invalid credentials" ? "Неверный логин или пароль" : (res.error || "Не удалось войти"));
+        setError(
+          res.error === "invalid credentials"
+            ? "Неверный логин или пароль"
+            : res.error === "account blocked"
+              ? "Ваш доступ заблокирован администратором"
+              : res.error || "Не удалось войти",
+        );
         return;
       }
       resetTasksStore();

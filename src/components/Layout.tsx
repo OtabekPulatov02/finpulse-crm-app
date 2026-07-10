@@ -63,7 +63,7 @@ function SidebarNav({
             )}
           </NavLink>
         ))}
-        {role !== "guest" && role !== "client" && (
+        {role !== "guest" && role !== "client" && role !== "accountant" && (
           <>
             <div className="mt-4 mb-1 px-3 text-[11px] font-semibold tracking-wider text-slate-400 uppercase">
               Интеграции
