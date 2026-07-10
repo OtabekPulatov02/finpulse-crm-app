@@ -32,8 +32,8 @@ function SidebarNav({
 }) {
   return (
     <>
-      <div className="flex items-center px-5 pt-5 pb-4">
-        <img src="/logo-cutted.png" alt="Finpulse CRM" className="h-30 w-auto object-contain" />
+      <div className="flex items-center justify-center px-5 pt-5 pb-4">
+        <img src="/logo-cutted.png" alt="Finpulse CRM" className="h-15 w-auto object-contain" />
       </div>
       <nav className="flex flex-1 flex-col gap-0.5 px-3 py-2">
         {nav.map(({ to, label, icon: Icon, count, end }) => (
