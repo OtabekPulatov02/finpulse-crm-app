@@ -19,7 +19,7 @@ const ALL_NAV = [
   { to: "/employees", label: "Сотрудники", icon: Users, hideFor: ["accountant", "guest", "client"] },
   { to: "/analytics", label: "Аналитика", icon: BarChart3, hideFor: ["client"] as string[] },
   { to: "/settings", label: "Настройки", icon: Settings, hideFor: ["accountant", "guest", "client"] },
-  { to: "/client", label: "Мои задачи", icon: ListTodo, hideFor: ["admin", "accountant", "guest"] as string[] },
+  { to: "/client", label: "Мои задачи", icon: ListTodo, end: true, hideFor: ["admin", "accountant", "guest"] as string[] },
   { to: "/client/profile", label: "Профиль", icon: User, hideFor: ["admin", "accountant", "guest"] as string[] },
 ];
 
@@ -41,10 +41,11 @@ function SidebarNav({
         </div>
       </div>
       <nav className="flex flex-1 flex-col gap-0.5 px-3 py-2">
-        {nav.map(({ to, label, icon: Icon, count }) => (
+        {nav.map(({ to, label, icon: Icon, count, end }) => (
           <NavLink
             key={to}
             to={to}
+            end={end}
             onClick={onNavigate}
             className={({ isActive }) =>
               `flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
