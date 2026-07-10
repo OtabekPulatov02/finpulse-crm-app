@@ -42,6 +42,10 @@ export interface CrmClient {
   assignedTo: string | null;
   tariff: string | null;
   note: string | null;
+  inn?: string | null;
+  mfo?: string | null;
+  bankAccount?: string | null;
+  address?: string | null;
   createdAt?: string | null;
   updatedAt?: string | null;
   telegramId?: number | null;
@@ -130,8 +134,9 @@ export const createClientRequest = (data: {
   company: string; phone?: string; position?: string; tariff?: string; assignedTo?: string; note?: string;
 }) => post<ClientResult>({ action: "client_create", ...data });
 
-export const updateClientRequest = (id: string, patch: Partial<Pick<CrmClient, "status" | "assignedTo" | "tariff" | "note" | "position">>) =>
-  post<ClientResult>({ action: "client_update", id, patch });
+export const updateClientRequest = (id: string, patch: Partial<Pick<CrmClient,
+  "status" | "assignedTo" | "tariff" | "note" | "position" | "inn" | "mfo" | "bankAccount" | "address"
+>>) => post<ClientResult>({ action: "client_update", id, patch });
 
 export const deleteClientRequest = (id: string) =>
   post<{ ok: boolean; id?: string; error?: string }>({ action: "client_delete", id });
@@ -149,6 +154,30 @@ export const updateTaskRequest = (num: number, patch: Partial<Pick<BotTask, "tex
 
 export const deleteTaskRequest = (num: number) =>
   post<{ ok: boolean; num?: number; error?: string }>({ action: "task_delete", num });
+
+/* Прикрепление файла к задаче из веб-CRM. Файл читается в base64 на
+   клиенте (fileToBase64) и отправляется одним JSON-запросом — бэкенд
+   пересылает байты в Telegram (группа бухгалтеров) и сохраняет
+   полученный file_id в task.files. Лимит ~9 МБ (см. api/crm.js). */
+export function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result || "");
+      const base64 = result.includes(",") ? result.slice(result.indexOf(",") + 1) : result;
+      resolve(base64);
+    };
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
+export const attachTaskFileRequest = async (num: number, file: File) => {
+  const dataBase64 = await fileToBase64(file);
+  return post<TaskResult>({
+    action: "task_attach_file", num, filename: file.name, mimeType: file.type, dataBase64,
+  });
+};
 
 export const fetchCalendar = () =>
   get<{ ok: boolean; calendar: CalendarEntry[] }>("r=calendar").then((d) => d.calendar ?? []);

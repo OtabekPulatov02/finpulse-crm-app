@@ -127,7 +127,7 @@ export function isOverdue(t: Task): boolean {
 export async function createTask(data: {
   title: string; client: string; clientId?: string | null; assignee: string;
   priority: Task["priority"]; dueDate?: string | null; description?: string;
-}): Promise<{ ok: boolean; error?: string }> {
+}): Promise<{ ok: boolean; error?: string; id?: number }> {
   const actor = getSession()?.name || "CRM";
   const r = await createTaskRequest({
     clientId: data.clientId ?? undefined,
@@ -158,7 +158,7 @@ export async function createTask(data: {
   tasks = [t, ...tasks];
   emit();
   void actor;
-  return { ok: true };
+  return { ok: true, id: t.id };
 }
 
 export async function editTask(id: number, patch: {

@@ -1,15 +1,91 @@
 import { useEffect, useState } from "react";
 import {
-  Building2, CheckCircle2, Clock3, KeyRound, ListTodo, Phone, ShieldCheck,
+  Banknote, Building2, CheckCircle2, Clock3, Hash, KeyRound, ListTodo, MapPin, Phone, ShieldCheck,
 } from "lucide-react";
-import { ClientHeader } from "../components/ClientHeader";
-import { toast } from "../components/ui";
+import { Badge, toast, type Tone } from "../components/ui";
 import {
   changePasswordRequest, fetchBotTasks, fetchClients, type BotTask, type CrmClient,
 } from "../api";
 import { useSession } from "../auth";
 
-function PasswordForm() {
+const STATUS_LABEL: Record<string, string> = {
+  active: "Активный", pending: "Ожидает активации", archived: "В архиве",
+};
+const STATUS_TONE: Record<string, Tone> = {
+  active: "green", pending: "cyan", archived: "gray",
+};
+
+const TABS = [
+  { id: "company", label: "Компания" },
+  { id: "stats", label: "Статистика" },
+  { id: "password", label: "Пароль" },
+] as const;
+type TabId = (typeof TABS)[number]["id"];
+
+function InfoRow({ icon: Icon, label, value }: { icon: React.ComponentType<{ className?: string }>; label: string; value: string }) {
+  return (
+    <div className="flex items-start gap-3 py-2.5">
+      <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500">
+        <Icon className="size-4" />
+      </span>
+      <div className="min-w-0">
+        <div className="text-[11px] font-medium text-slate-400">{label}</div>
+        <div className="truncate text-[13.5px] font-medium text-slate-700">{value || "—"}</div>
+      </div>
+    </div>
+  );
+}
+
+function CompanyTab({ client }: { client: CrmClient | null }) {
+  if (!client) {
+    return <p className="py-8 text-center text-sm text-slate-400">Карточка компании ещё не создана бухгалтером.</p>;
+  }
+  return (
+    <div>
+      <div className="mb-2 flex items-center justify-between">
+        <div className="text-base font-semibold">{client.company}</div>
+        <Badge tone={STATUS_TONE[client.status] ?? "gray"}>{STATUS_LABEL[client.status] ?? client.status}</Badge>
+      </div>
+      <div className="divide-y divide-slate-100">
+        <InfoRow icon={Phone} label="Телефон" value={client.phone ?? ""} />
+        <InfoRow icon={Building2} label="Должность контакта" value={client.position ?? ""} />
+        <InfoRow icon={ShieldCheck} label="Тариф" value={client.tariff ?? ""} />
+        <InfoRow icon={Hash} label="ИНН" value={client.inn ?? ""} />
+        <InfoRow icon={Banknote} label="МФО" value={client.mfo ?? ""} />
+        <InfoRow icon={Banknote} label="Расчётный счёт" value={client.bankAccount ?? ""} />
+        <InfoRow icon={MapPin} label="Юридический адрес" value={client.address ?? ""} />
+        <InfoRow icon={Building2} label="Ответственный бухгалтер" value={client.assignedTo ?? "не назначен"} />
+      </div>
+      <p className="mt-3 text-xs text-slate-400">
+        Реквизиты (ИНН, МФО, счёт, адрес) заполняет ваш бухгалтер — если что-то указано неверно, напишите в Telegram-боте.
+      </p>
+    </div>
+  );
+}
+
+function StatsTab({ tasks }: { tasks: BotTask[] | null }) {
+  const created = tasks?.length ?? 0;
+  const inProgress = tasks?.filter((t) => t.status === "in_progress").length ?? 0;
+  const done = tasks?.filter((t) => t.status === "done").length ?? 0;
+  return (
+    <div className="grid grid-cols-3 gap-3 max-sm:grid-cols-1">
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex items-center gap-2 text-xs font-medium text-slate-500"><ListTodo className="size-3.5" /> Всего создано</div>
+        <div className="mt-1.5 text-2xl font-bold tracking-tight">{created}</div>
+      </div>
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex items-center gap-2 text-xs font-medium text-slate-500"><Clock3 className="size-3.5" /> В работе</div>
+        <div className="mt-1.5 text-2xl font-bold tracking-tight text-brand-600">{inProgress}</div>
+      </div>
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex items-center gap-2 text-xs font-medium text-slate-500"><CheckCircle2 className="size-3.5" /> Выполнено</div>
+        <div className="mt-1.5 text-2xl font-bold tracking-tight text-emerald-600">{done}</div>
+      </div>
+    </div>
+  );
+}
+
+function PasswordTab() {
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -37,7 +113,7 @@ function PasswordForm() {
   const inputClass = "w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm transition focus:border-brand-500 focus:bg-white focus:ring-2 focus:ring-brand-100 focus:outline-none";
 
   return (
-    <form onSubmit={submit} className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+    <form onSubmit={submit} className="max-w-sm space-y-3">
       <div className="flex items-center gap-2 text-sm font-semibold"><KeyRound className="size-4" /> Сменить пароль</div>
       <input type="password" autoComplete="current-password" placeholder="Текущий пароль" value={current}
         onChange={(e) => setCurrent(e.target.value)} className={inputClass} />
@@ -57,6 +133,7 @@ export default function ClientProfile() {
   const session = useSession();
   const [client, setClient] = useState<CrmClient | null>(null);
   const [tasks, setTasks] = useState<BotTask[] | null>(null);
+  const [tab, setTab] = useState<TabId>("company");
 
   useEffect(() => {
     let alive = true;
@@ -65,53 +142,30 @@ export default function ClientProfile() {
     return () => { alive = false; };
   }, []);
 
-  const created = tasks?.length ?? 0;
-  const inProgress = tasks?.filter((t) => t.status === "in_progress").length ?? 0;
-  const done = tasks?.filter((t) => t.status === "done").length ?? 0;
-
   return (
-    <div className="min-h-screen bg-slate-50">
-      <ClientHeader />
+    <div className="space-y-5">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">Профиль</h1>
+        <p className="mt-0.5 text-sm text-slate-500">
+          {client?.company ?? session?.company ?? session?.name} — данные компании, статистика по задачам и смена пароля.
+        </p>
+      </div>
 
-      <main className="mx-auto w-full max-w-3xl space-y-5 px-4 py-6">
-        <div>
-          <h1 className="text-lg font-semibold">Профиль</h1>
-          <p className="mt-0.5 text-sm text-slate-500">Данные компании, статистика по задачам и смена пароля.</p>
-        </div>
+      <div className="flex gap-1.5 rounded-lg bg-slate-100 p-1 max-w-max">
+        {TABS.map((t) => (
+          <button key={t.id} onClick={() => setTab(t.id)}
+            className={`rounded-md px-3.5 py-1.5 text-[13px] font-medium transition ${
+              tab === t.id ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
-              <Building2 className="size-5" />
-            </div>
-            <div className="min-w-0">
-              <div className="truncate text-sm font-semibold">{client?.company ?? session?.company ?? session?.name}</div>
-              <div className="truncate text-xs text-slate-400">{client?.position || "Контактное лицо не указано"}</div>
-            </div>
-          </div>
-          <div className="mt-4 grid grid-cols-2 gap-3 text-[13px] max-sm:grid-cols-1">
-            <div className="flex items-center gap-2 text-slate-500"><Phone className="size-3.5 shrink-0" /> {client?.phone || "—"}</div>
-            <div className="flex items-center gap-2 text-slate-500"><ShieldCheck className="size-3.5 shrink-0" /> Тариф: {client?.tariff || "—"}</div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-3 gap-3 max-sm:grid-cols-1">
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="flex items-center gap-2 text-xs font-medium text-slate-500"><ListTodo className="size-3.5" /> Всего создано</div>
-            <div className="mt-1.5 text-2xl font-bold tracking-tight">{created}</div>
-          </div>
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="flex items-center gap-2 text-xs font-medium text-slate-500"><Clock3 className="size-3.5" /> В работе</div>
-            <div className="mt-1.5 text-2xl font-bold tracking-tight text-brand-600">{inProgress}</div>
-          </div>
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="flex items-center gap-2 text-xs font-medium text-slate-500"><CheckCircle2 className="size-3.5" /> Выполнено</div>
-            <div className="mt-1.5 text-2xl font-bold tracking-tight text-emerald-600">{done}</div>
-          </div>
-        </div>
-
-        <PasswordForm />
-      </main>
+      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        {tab === "company" && <CompanyTab client={client} />}
+        {tab === "stats" && <StatsTab tasks={tasks} />}
+        {tab === "password" && <PasswordTab />}
+      </div>
     </div>
   );
 }
