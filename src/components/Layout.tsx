@@ -11,7 +11,6 @@ import { resetEmployeesStore } from "../store/employees";
 import { resetCalendarEventsStore } from "../store/calendarEvents";
 import { clearSession, ROLE_LABEL, useSession } from "../auth";
 import { formatPhone } from "../lib/phone";
-import { BrandMark } from "./BrandMark";
 
 const ALL_NAV = [
   { to: "/dashboard", label: "Дашборд", icon: LayoutDashboard, hideFor: ["client"] as string[] },
@@ -34,7 +33,7 @@ function SidebarNav({
   return (
     <>
       <div className="flex items-center px-5 pt-5 pb-4">
-        <BrandMark className="h-12" />
+        <img src="/logo-cutted.png" alt="Finpulse CRM" className="h-30 w-auto object-contain" />
       </div>
       <nav className="flex flex-1 flex-col gap-0.5 px-3 py-2">
         {nav.map(({ to, label, icon: Icon, count, end }) => (
