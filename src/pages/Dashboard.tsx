@@ -5,7 +5,7 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Avatar, Badge, Card, CardHeader, toast } from "../components/ui";
-import { priorityTone } from "../data/demo";
+import { priorityTone, type Task } from "../data/demo";
 import { displayStatus, isLiveTask, isOverdue, setTaskStatus, useTasks } from "../store/tasks";
 import { useClients } from "../store/clients";
 import { hydrateEmployees, useEmployees } from "../store/employees";
@@ -57,7 +57,24 @@ export default function Dashboard() {
     { label: "Просроченные", value: String(overdueTasks.length), icon: AlertCircle, tone: "text-red-600 bg-red-50" },
   ];
 
-  const today = tasks.filter((t) => { const s = displayStatus(t); return s !== "Выполнена" && s !== "Архив"; }).slice(0, 5);
+  /* Выполненные сегодня задачи остаются в списке (зачёркнутые, внизу) до конца
+     дня — и пропадают из «на сегодня» только на следующий день, когда их
+     doneAt больше не совпадает с текущей календарной датой. */
+  const isDoneToday = (t: Task) => {
+    if (!t.doneAt) return false;
+    const d = new Date(t.doneAt);
+    const now = new Date();
+    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+  };
+  const today = tasks
+    .filter((t) => {
+      const s = displayStatus(t);
+      if (s === "Архив") return false;
+      if (s === "Выполнена") return isDoneToday(t);
+      return true;
+    })
+    .sort((a, b) => Number(a.status === "Выполнена") - Number(b.status === "Выполнена"))
+    .slice(0, 5);
 
   const requests = tasks
     .filter((t) => t.fromBot && isLiveTask(t.id) && displayStatus(t) !== "Архив")
@@ -109,19 +126,25 @@ export default function Dashboard() {
             } />
             {today.length ? (
               <div className="divide-y divide-slate-100">
-                {today.map((t) => (
-                  <div key={t.id} className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50">
-                    <input type="checkbox" className="size-4 accent-brand-600"
-                      onChange={() => { setTaskStatus(t.id, "Выполнена"); toast("Задача отмечена выполненной"); }} />
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-[13.5px] font-medium">{t.title}</div>
-                      <div className="text-xs text-slate-400">{t.client} · {t.assignee}</div>
+                {today.map((t) => {
+                  const done = t.status === "Выполнена";
+                  return (
+                    <div key={t.id} className={`flex items-center gap-3 px-5 py-3 hover:bg-slate-50 ${done ? "opacity-50" : ""}`}>
+                      <input type="checkbox" className="size-4 accent-brand-600" checked={done}
+                        onChange={() => {
+                          if (done) { setTaskStatus(t.id, "В работе"); }
+                          else { setTaskStatus(t.id, "Выполнена"); toast("Задача отмечена выполненной"); }
+                        }} />
+                      <div className="min-w-0 flex-1">
+                        <div className={`truncate text-[13.5px] font-medium ${done ? "text-slate-400 line-through" : ""}`}>{t.title}</div>
+                        <div className="text-xs text-slate-400">{t.client} · {t.assignee}</div>
+                      </div>
+                      {t.fromBot && <Send className="size-3.5 shrink-0 text-cyan-500" />}
+                      <Badge tone={priorityTone[t.priority]}>{t.priority}</Badge>
+                      <span className="text-xs whitespace-nowrap text-slate-400">до {t.due}</span>
                     </div>
-                    {t.fromBot && <Send className="size-3.5 shrink-0 text-cyan-500" />}
-                    <Badge tone={priorityTone[t.priority]}>{t.priority}</Badge>
-                    <span className="text-xs whitespace-nowrap text-slate-400">до {t.due}</span>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <p className="px-5 py-8 text-center text-sm text-slate-400">Нет открытых задач — можно перевести дух.</p>

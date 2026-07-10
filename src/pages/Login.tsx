@@ -76,10 +76,7 @@ export default function Login() {
           </div>
         </div>
 
-        <h1 className="mb-1 text-lg font-semibold">Вход в систему</h1>
-        <p className="mb-5 text-sm text-slate-500">
-          Сотрудники — по логину, клиенты — по номеру телефона.
-        </p>
+        <h1 className="mb-5 text-lg font-semibold">Вход в систему</h1>
 
         <form onSubmit={submit} className="space-y-3.5">
           <div>
