@@ -4,6 +4,7 @@ import { Field, Input, Modal, Textarea, toast } from "../components/ui";
 import {
   attachTaskFileRequest, createTaskRequest, fetchBotTasks, fmtTs, updateTaskRequest, type BotTask,
 } from "../api";
+import { formatSumsInText } from "../lib/amount";
 
 const STATUS_LABEL: Record<BotTask["status"], string> = {
   new: "Новая", in_progress: "В работе", done: "Выполнена",
@@ -95,7 +96,7 @@ function TaskFormModal({
           </div>
         )}
         <Field label="Описание задачи" required>
-          <Textarea value={text} onChange={(e) => setText(e.target.value)} placeholder="Что нужно сделать?" rows={5} />
+          <Textarea value={text} onChange={(e) => setText(e.target.value)} onBlur={() => setText((v) => formatSumsInText(v))} placeholder="Что нужно сделать?" rows={5} />
         </Field>
         <Field label="Желаемый срок (необязательно)">
           <Input type="date" value={dueDate ?? ""} onChange={(e) => setDueDate(e.target.value)} />
