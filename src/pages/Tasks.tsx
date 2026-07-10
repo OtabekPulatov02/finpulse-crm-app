@@ -15,7 +15,7 @@ import {
 import { createTask, deleteTaskEverywhere, displayStatus, editTask, isOverdue, setTaskStatus, useTasks } from "../store/tasks";
 import { hydrateClients, useClients } from "../store/clients";
 import { hydrateEmployees, useEmployees } from "../store/employees";
-import { attachTaskFileRequest, fetchLogs } from "../api";
+import { attachTaskFileRequest, fetchLogs, openTaskFile } from "../api";
 import { mapLog, type LogView } from "../lib/logs";
 import { formatSumsInText } from "../lib/amount";
 
@@ -144,6 +144,22 @@ function TaskFormModal({
         <Field label="Описание">
           <Textarea value={description} onChange={(e) => setDescription(e.target.value)} onBlur={() => setDescription((v) => formatSumsInText(v))} placeholder="Описание задачи" />
         </Field>
+        {!!task?.attachments?.length && (
+          <Field label="Прикреплённые файлы">
+            <div className="flex flex-wrap gap-2">
+              {task.attachments.map((a) => (
+                <button
+                  key={a.index}
+                  type="button"
+                  onClick={() => openTaskFile(task.id, a.index).catch(() => toast("Не удалось открыть файл"))}
+                  className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[13px] font-medium text-slate-600 hover:border-brand-400 hover:text-brand-600"
+                >
+                  <Paperclip className="size-3.5" /> Вложение {a.index + 1}
+                </button>
+              ))}
+            </div>
+          </Field>
+        )}
         <Field label="Файл или фото (необязательно)">
           <input ref={fileInputRef} type="file" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" className="hidden"
             onChange={(e) => setFile(e.target.files?.[0] ?? null)} />

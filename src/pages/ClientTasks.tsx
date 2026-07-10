@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Hash, Kanban, LayoutList, Paperclip, Pencil, Plus, X } from "lucide-react";
 import { Field, Input, Modal, Textarea, toast } from "../components/ui";
 import {
-  attachTaskFileRequest, createTaskRequest, fetchBotTasks, fmtTs, updateTaskRequest, type BotTask,
+  attachTaskFileRequest, createTaskRequest, fetchBotTasks, fmtTs, openTaskFile, updateTaskRequest, type BotTask,
 } from "../api";
 import { formatSumsInText } from "../lib/amount";
 
@@ -120,8 +120,19 @@ function TaskFormModal({
               </button>
             </div>
           )}
-          {edit && task && task.files > 0 && (
-            <p className="mt-1.5 text-xs text-slate-400">Уже прикреплено файлов: {task.files}</p>
+          {edit && task && !!task.attachments?.length && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {task.attachments.map((a) => (
+                <button
+                  key={a.index}
+                  type="button"
+                  onClick={() => openTaskFile(task.num, a.index).catch(() => {})}
+                  className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[13px] font-medium text-slate-600 hover:border-brand-400 hover:text-brand-600"
+                >
+                  <Paperclip className="size-3.5" /> Вложение {a.index + 1}
+                </button>
+              ))}
+            </div>
           )}
         </Field>
       </div>

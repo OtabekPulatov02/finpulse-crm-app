@@ -74,6 +74,7 @@ export async function hydrateFromBot() {
       fromBot: true,
       source: b.source === "crm" ? "crm" as const : "bot" as const,
       created: fmtTs(b.createdAt),
+      attachments: b.attachments ?? [],
     }));
     live.forEach((t) => liveIds.add(t.id));
     tasks = [...live, ...tasks.filter((t) => !liveIds.has(t.id))];
