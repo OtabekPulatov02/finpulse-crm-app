@@ -357,7 +357,10 @@ export default function Tasks() {
                         onClick={() => setViewTask(t)}
                         className={`cursor-grab border-l-[3px] p-3 transition select-none active:cursor-grabbing ${prioBorder[t.priority]} ${
                           dragId === t.id ? "rotate-1 opacity-40 shadow-lg" : "hover:-translate-y-0.5 hover:shadow-md"}`}>
-                        <div className="line-clamp-2 text-[13px] leading-snug font-semibold">{t.title}</div>
+                        <div className="flex items-center gap-1 text-[11px] font-medium text-slate-400">
+                          <Hash className="size-3" />{t.id}
+                        </div>
+                        <div className="mt-0.5 line-clamp-2 text-[13px] leading-snug font-semibold">{t.title}</div>
                         <div className="mt-1 truncate text-xs text-slate-400">{t.client}</div>
                         <div className="mt-2.5 flex items-center justify-between">
                           <span className={`flex items-center gap-1.5 text-[11px] ${isOverdue(t) ? "font-semibold text-red-500" : "text-slate-400"}`}>
