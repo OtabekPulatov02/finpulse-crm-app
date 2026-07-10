@@ -204,6 +204,16 @@ export async function guestLoginRequest(): Promise<LoginResult> {
   return r.json();
 }
 
+export async function changePasswordRequest(currentPassword: string, newPassword: string): Promise<{ ok: boolean; error?: string }> {
+  const r = await fetch(AUTH_API, {
+    method: "POST",
+    headers: { "content-type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ action: "change_password", currentPassword, newPassword }),
+    signal: AbortSignal.timeout(10000),
+  });
+  return r.json();
+}
+
 /* ---------------- Календарь: повторяющиеся события (налоги/платежи) ---------------- */
 
 export interface CalendarEventEntry {

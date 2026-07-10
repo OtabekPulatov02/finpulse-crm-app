@@ -3,6 +3,7 @@ import Layout from "./components/Layout";
 import { RequireAuth, RequireClientArea, RequireStaffArea } from "./components/RequireAuth";
 import Login from "./pages/Login";
 import ClientTasks from "./pages/ClientTasks";
+import ClientProfile from "./pages/ClientProfile";
 import Dashboard from "./pages/Dashboard";
 import Tasks from "./pages/Tasks";
 import Clients from "./pages/Clients";
@@ -20,6 +21,7 @@ export default function App() {
       <Route element={<RequireAuth />}>
         <Route element={<RequireClientArea />}>
           <Route path="/client" element={<ClientTasks />} />
+          <Route path="/client/profile" element={<ClientProfile />} />
         </Route>
 
         <Route element={<RequireStaffArea />}>
