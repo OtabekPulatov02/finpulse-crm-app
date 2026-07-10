@@ -9,6 +9,7 @@ import {
 } from "../store/employees";
 import { hydrateClients, useClients } from "../store/clients";
 import { hydrateFromBot, useTasks } from "../store/tasks";
+import { formatPhone } from "../lib/phone";
 
 const ROLE_LABEL: Record<string, string> = { admin: "Администратор", accountant: "Бухгалтер" };
 
@@ -37,7 +38,7 @@ function EmployeeFormModal({
 }: { open: boolean; onClose: () => void; employee?: CrmEmployee | null; onCreated: (password: string) => void }) {
   const edit = !!employee;
   const [name, setName] = useState(employee?.name ?? "");
-  const [phone, setPhone] = useState(employee?.phone ?? "");
+  const [phone, setPhone] = useState(edit ? formatPhone(employee?.phone ?? "") : "");
   const [role, setRole] = useState<"admin" | "accountant">(employee?.role ?? "accountant");
   const [saving, setSaving] = useState(false);
 
@@ -153,7 +154,7 @@ export default function Employees() {
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-[14px] font-semibold">{e.name}</div>
                   <div className="truncate text-xs text-slate-400">{ROLE_LABEL[e.role] ?? e.role}</div>
-                  <div className="mt-1 text-xs text-slate-400">{e.phone || "—"}</div>
+                  <div className="mt-1 text-xs text-slate-400">{e.phone ? formatPhone(e.phone) : "—"}</div>
                 </div>
                 <div className="flex shrink-0 items-center gap-1.5">
                   <Badge tone={e.active ? "green" : "gray"}>{e.active ? "Активен" : "Отключён"}</Badge>

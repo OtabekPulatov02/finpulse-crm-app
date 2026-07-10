@@ -6,6 +6,7 @@ import { fetchLogs } from "../api";
 import { mapLog, type LogView } from "../lib/logs";
 import { hydrateEmployees, useEmployees } from "../store/employees";
 import { EDITABLE_STATUSES, PRIORITIES, priorityTone, statusTone } from "../data/demo";
+import { formatPhone } from "../lib/phone";
 
 const tabs = [
   { id: "users", label: "Пользователи", icon: Users },
@@ -101,7 +102,7 @@ export default function Settings() {
                   {employees.map((e) => (
                     <tr key={e.id} className="hover:bg-slate-50">
                       <td className="px-5 py-3 whitespace-nowrap"><span className="flex items-center gap-2.5 font-medium"><Avatar name={e.name} />{e.name}</span></td>
-                      <td className="px-4 py-3 whitespace-nowrap text-slate-500">{e.phone ?? "—"}</td>
+                      <td className="px-4 py-3 whitespace-nowrap text-slate-500">{e.phone ? formatPhone(e.phone) : "—"}</td>
                       <td className="px-4 py-3 whitespace-nowrap"><Badge tone={ROLE_TONE[e.role] ?? "gray"}>{ROLE_LABEL[e.role] ?? e.role}</Badge></td>
                       <td className="px-4 py-3 whitespace-nowrap">{e.active ? <Badge tone="green">Активен</Badge> : <Badge tone="gray">Отключён</Badge>}</td>
                     </tr>
