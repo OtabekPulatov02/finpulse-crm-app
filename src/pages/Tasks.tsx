@@ -17,6 +17,7 @@ import { hydrateClients, useClients } from "../store/clients";
 import { hydrateEmployees, useEmployees } from "../store/employees";
 import { attachTaskFileRequest, fetchLogs } from "../api";
 import { mapLog, type LogView } from "../lib/logs";
+import { formatSumsInText } from "../lib/amount";
 
 /* ---------------- Вспомогательное ---------------- */
 
@@ -109,7 +110,7 @@ function TaskFormModal({
       }>
       <div className="space-y-4">
         <Field label="Название задачи" required>
-          <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Название задачи" autoFocus />
+          <Input value={title} onChange={(e) => setTitle(e.target.value)} onBlur={() => setTitle((v) => formatSumsInText(v))} placeholder="Название задачи" autoFocus />
         </Field>
         <div className="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
           <Field label="Клиент" required>
@@ -141,7 +142,7 @@ function TaskFormModal({
           </Field>
         </div>
         <Field label="Описание">
-          <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Описание задачи" />
+          <Textarea value={description} onChange={(e) => setDescription(e.target.value)} onBlur={() => setDescription((v) => formatSumsInText(v))} placeholder="Описание задачи" />
         </Field>
         <Field label="Файл или фото (необязательно)">
           <input ref={fileInputRef} type="file" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" className="hidden"

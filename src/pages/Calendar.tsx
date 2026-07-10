@@ -6,6 +6,7 @@ import { useTasks } from "../store/tasks";
 import { hydrateClients, useClients } from "../store/clients";
 import { createCalendarEvent, hydrateCalendarEvents, removeCalendarEvent, useCalendarEvents } from "../store/calendarEvents";
 import type { CalendarEventEntry } from "../api";
+import { formatSumsInText } from "../lib/amount";
 
 type EvType = "tax" | "pay" | "task";
 interface Ev {
@@ -262,7 +263,7 @@ export default function Calendar() {
           </div>
           <div>
             <label className="mb-1.5 block text-[13px] font-medium">Что напомнить <span className="text-red-500">*</span></label>
-            <input value={nTitle} onChange={(e) => setNTitle(e.target.value)} placeholder="Аренда офиса — 12 000 000 сум" className={inp} />
+            <input value={nTitle} onChange={(e) => setNTitle(e.target.value)} onBlur={() => setNTitle((v) => formatSumsInText(v))} placeholder="Аренда офиса — 12 000 000 сум" className={inp} />
             <div className="mt-2 flex flex-wrap gap-1.5">
               {suggests.map((s) => (
                 <button key={s} onClick={() => setNTitle(s)} className="rounded-full border border-slate-200 px-2.5 py-1 text-xs text-slate-500 hover:border-brand-200 hover:bg-brand-50 hover:text-brand-600">{s}</button>

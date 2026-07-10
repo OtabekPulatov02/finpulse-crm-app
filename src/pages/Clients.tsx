@@ -11,6 +11,7 @@ import { useEmployees, hydrateEmployees } from "../store/employees";
 import type { CrmClient } from "../api";
 import { createClient, hydrateClients, patchClient, removeClient, useClients } from "../store/clients";
 import { formatPhone } from "../lib/phone";
+import { formatSumsInText } from "../lib/amount";
 
 const STATUS_LABEL: Record<string, string> = {
   active: "Активный", pending: "Ожидает активации", archived: "В архиве",
@@ -94,7 +95,7 @@ function ClientFormModal({
             </Select>
           </Field>
         </div>
-        <Field label="Комментарий"><Textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Комментарий" /></Field>
+        <Field label="Комментарий"><Textarea value={note} onChange={(e) => setNote(e.target.value)} onBlur={() => setNote((v) => formatSumsInText(v))} placeholder="Комментарий" /></Field>
         {edit && (
           <>
             <div className="pt-1 text-[13px] font-semibold text-slate-500">Реквизиты компании</div>
