@@ -6,7 +6,7 @@ import {
 import { useEffect, useState } from "react";
 import { Avatar, Menu, MenuDivider, MenuItem, Toaster, toast } from "./ui";
 import { FilePreviewer } from "./FilePreview";
-import { displayStatus, hydrateFromBot, isOverdue, resetTasksStore, useTasks } from "../store/tasks";
+import { displayStatus, hydrateFromBot, isOverdue, resetTasksStore, startLiveTasksSync, useTasks } from "../store/tasks";
 import { hydrateClients, resetClientsStore, useClients } from "../store/clients";
 import { resetEmployeesStore } from "../store/employees";
 import { resetCalendarEventsStore } from "../store/calendarEvents";
@@ -101,7 +101,7 @@ export default function Layout() {
   const [searchQ, setSearchQ] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   useEffect(() => { setMobileNavOpen(false); setSearchOpen(false); setSearchQ(""); }, [location.pathname]);
-  useEffect(() => { void hydrateFromBot(); void hydrateClients(); }, []);
+  useEffect(() => { void hydrateFromBot(); void hydrateClients(); startLiveTasksSync(); }, []);
   const activeCount = tasks.filter((t) => t.status === "Новая" || t.status === "В работе").length;
 
   const searchTerm = searchQ.trim().toLowerCase();
