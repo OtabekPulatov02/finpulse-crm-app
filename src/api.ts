@@ -140,6 +140,26 @@ async function post<T>(body: Record<string, unknown>): Promise<T> {
   return r.json() as Promise<T>;
 }
 
+export interface AccessRequest {
+  id: string;
+  type: "phone_mismatch" | "phone_conflict" | "telegram_rebind";
+  status: "pending" | "approved" | "rejected";
+  at: string;
+  company?: string;
+  claimedPhone?: string | null;
+  knownPhone?: string | null;
+  otherCompany?: string | null;
+  tgName?: string | null;
+  telegramId?: number | string;
+  resolvedBy?: string;
+}
+
+export const fetchAccessRequests = () =>
+  get<{ ok: boolean; requests: AccessRequest[] }>("r=access_requests").then((d) => d.requests ?? []);
+
+export const resolveAccessRequest = (id: string, approve: boolean) =>
+  post<{ ok: boolean; error?: string }>({ action: "access_request_resolve", id, approve });
+
 /* ---------------- Клиенты ---------------- */
 
 export const fetchClients = () =>

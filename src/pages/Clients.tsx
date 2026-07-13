@@ -1,14 +1,15 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
-  Archive, CheckCircle2, ExternalLink, MoreHorizontal, Pencil, Plus, Search, Trash2, UserPlus,
+  Archive, CheckCircle2, ExternalLink, MoreHorizontal, Pencil, Plus, Search, ShieldAlert, Trash2, UserPlus,
 } from "lucide-react";
 import {
   Avatar, Badge, Card, ConfirmModal, Field, Input, Menu, MenuDivider,
   MenuItem, Modal, Select, Textarea, toast, type Tone,
 } from "../components/ui";
 import { useEmployees, hydrateEmployees } from "../store/employees";
-import type { CrmClient } from "../api";
+import type { AccessRequest, CrmClient } from "../api";
+import { fetchAccessRequests, resolveAccessRequest } from "../api";
 import { createClient, hydrateClients, patchClient, removeClient, useClients } from "../store/clients";
 import { formatPhone } from "../lib/phone";
 import { formatSumsInText } from "../lib/amount";
@@ -114,6 +115,67 @@ function ClientFormModal({
   );
 }
 
+
+const REQ_LABEL: Record<AccessRequest["type"], string> = {
+  phone_mismatch: "Телефон не совпадает с карточкой клиента",
+  phone_conflict: "Телефон уже привязан к другой компании",
+  telegram_rebind: "Новый Telegram-аккаунт просит доступ к компании",
+};
+
+function AccessRequestsBlock() {
+  const [reqs, setReqs] = useState<AccessRequest[]>([]);
+  const [busy, setBusy] = useState<string | null>(null);
+  useEffect(() => {
+    fetchAccessRequests().then((all) => setReqs(all.filter((r) => r.status === "pending"))).catch(() => {});
+  }, []);
+  if (!reqs.length) return null;
+
+  const resolve = async (r: AccessRequest, approve: boolean) => {
+    setBusy(r.id);
+    try {
+      const res = await resolveAccessRequest(r.id, approve);
+      if (!res.ok) { toast(res.error || "Не удалось обработать заявку"); return; }
+      setReqs((s) => s.filter((x) => x.id !== r.id));
+      toast(approve ? "Доступ выдан — клиент получил логин и пароль в Telegram" : "Заявка отклонена — клиент уведомлён");
+    } finally { setBusy(null); }
+  };
+
+  return (
+    <Card className="border-amber-200 bg-amber-50/50">
+      <div className="flex items-center gap-2.5 border-b border-amber-200/70 px-5 py-3.5">
+        <ShieldAlert className="size-[18px] text-amber-600" />
+        <h2 className="text-[14px] font-semibold text-amber-800">Заявки на доступ — нужна проверка ({reqs.length})</h2>
+      </div>
+      <div className="divide-y divide-amber-100">
+        {reqs.map((r) => (
+          <div key={r.id} className="flex flex-wrap items-center gap-3 px-5 py-3.5">
+            <div className="min-w-0 flex-1">
+              <div className="text-[13.5px] font-semibold">{r.company || "—"}</div>
+              <div className="mt-0.5 text-[12.5px] text-slate-600">
+                {REQ_LABEL[r.type]}
+                {r.claimedPhone && <> · заявленный телефон: <b>{r.claimedPhone}</b></>}
+                {r.knownPhone && <> · в карточке: <b>{r.knownPhone}</b></>}
+                {r.otherCompany && <> · телефон закреплён за: <b>{r.otherCompany}</b></>}
+                {r.tgName && <> · от: {r.tgName}</>}
+              </div>
+            </div>
+            <div className="flex shrink-0 gap-2">
+              <button disabled={busy === r.id} onClick={() => resolve(r, true)}
+                className="rounded-lg bg-emerald-600 px-3.5 py-1.5 text-[12.5px] font-medium text-white hover:bg-emerald-700 disabled:opacity-50">
+                Выдать доступ
+              </button>
+              <button disabled={busy === r.id} onClick={() => resolve(r, false)}
+                className="rounded-lg border border-slate-300 bg-white px-3.5 py-1.5 text-[12.5px] font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50">
+                Отклонить
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
 export default function Clients() {
   const clients = useClients();
   useEffect(() => { void hydrateClients(); }, []);
@@ -156,6 +218,8 @@ export default function Clients() {
           <Plus className="size-4" /> Добавить клиента
         </button>
       </div>
+
+      <AccessRequestsBlock />
 
       <Card>
         <div className="flex flex-wrap gap-2.5 border-b border-slate-200 p-4">
