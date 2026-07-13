@@ -1,13 +1,44 @@
 import { useSyncExternalStore } from "react";
 import {
   createTaskRequest, deleteTaskRequest, fetchBotTasks, pushBotStatus, sendTaskMessageRequest, updateTaskRequest,
-  fmtTs, type BotStatus,
+  fmtTs, type BotStatus, type BotTask,
 } from "../api";
 import type { Task, TaskStatus } from "../data/demo";
 import { getSession } from "../auth";
 
 let tasks: Task[] = [];
 const listeners = new Set<() => void>();
+
+/* Кэш последнего снимка задач в localStorage — привязан к токену сессии,
+   чтобы не показать данные одного аккаунта другому на этом же устройстве.
+   Назначение: сразу после перезагрузки страницы отрисовать карточки из
+   кэша (пока идёт свежий запрос к бэкенду), а не показывать пустой экран
+   до завершения сетевого запроса. */
+function cacheKey(): string | null {
+  const token = getSession()?.token;
+  return token ? `fp_tasks_cache:${token}` : null;
+}
+function loadTasksCache(): Task[] {
+  try {
+    const key = cacheKey();
+    if (!key) return [];
+    const raw = localStorage.getItem(key);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+function saveTasksCache(list: Task[]) {
+  try {
+    const key = cacheKey();
+    if (!key) return;
+    localStorage.setItem(key, JSON.stringify(list));
+  } catch {
+    /* localStorage переполнен/недоступен — кэш просто необязателен, не критично */
+  }
+}
 
 /* id реальных задач (из Telegram-бота ИЛИ созданных из CRM через реальный
    API) — все задачи в CRM теперь живые, синхронизируются с бэкендом. */
@@ -32,10 +63,12 @@ export const isLiveTask = (id: number) => liveIds.has(id);
    иначе данные, полученные под одной ролью (например, реальные задачи
    супер-админа), остаются видны после переключения на гостя/клиента. */
 export function resetTasksStore() {
+  const key = cacheKey();
   hydrated = false;
   liveIds.clear();
   tasks = [];
   emit();
+  if (key) { try { localStorage.removeItem(key); } catch { /* noop */ } }
 }
 
 const fromBotStatus: Record<BotStatus, TaskStatus> = {
@@ -54,36 +87,87 @@ export function isoToDisplayDue(iso?: string | null): string {
   return `${m[3]}.${m[2]}`;
 }
 
-/* Подтягиваем реальные задачи с бэкенда (однократно при загрузке приложения) */
+function botTaskToTask(b: BotTask): Task {
+  return {
+    id: b.num,
+    title: b.text.length > 80 ? b.text.slice(0, 77) + "…" : b.text,
+    description: b.text.length > 80 ? b.text : undefined,
+    client: b.company ?? (b.type === "reminder" ? "Все клиенты" : "—"),
+    assignee: b.assignee ?? "не назначен",
+    status: fromBotStatus[b.status] ?? "Новая",
+    priority: "Средний",
+    due: isoToDisplayDue(b.dueDate),
+    dueDate: b.dueDate ?? null,
+    doneAt: b.doneAt ?? null,
+    fromBot: true,
+    source: b.source === "crm" ? "crm" as const : "bot" as const,
+    created: fmtTs(b.createdAt),
+    attachments: b.attachments ?? [],
+    type: b.type ?? "task",
+    thread: b.thread ?? [],
+  };
+}
+
+/* Подтягиваем реальные задачи с бэкенда (однократно при загрузке приложения).
+   Пока идёт сетевой запрос, если стор ещё пуст (свежая перезагрузка
+   страницы), сразу показываем последний кэшированный снимок — иначе
+   канбан несколько сотен миллисекунд выглядит пустым, хотя данные почти
+   наверняка не изменились с прошлого раза. */
 export async function hydrateFromBot() {
   if (hydrated) return;
   hydrated = true;
+
+  if (!tasks.length) {
+    const cached = loadTasksCache();
+    if (cached.length) {
+      cached.forEach((t) => liveIds.add(t.id));
+      tasks = cached;
+      emit();
+    }
+  }
+
   try {
     const bot = await fetchBotTasks();
-    const live: Task[] = bot.map((b) => ({
-      id: b.num,
-      title: b.text.length > 80 ? b.text.slice(0, 77) + "…" : b.text,
-      description: b.text.length > 80 ? b.text : undefined,
-      client: b.company ?? (b.type === "reminder" ? "Все клиенты" : "—"),
-      assignee: b.assignee ?? "не назначен",
-      status: fromBotStatus[b.status] ?? "Новая",
-      priority: "Средний",
-      due: isoToDisplayDue(b.dueDate),
-      dueDate: b.dueDate ?? null,
-      doneAt: b.doneAt ?? null,
-      fromBot: true,
-      source: b.source === "crm" ? "crm" as const : "bot" as const,
-      created: fmtTs(b.createdAt),
-      attachments: b.attachments ?? [],
-      type: b.type ?? "task",
-      thread: b.thread ?? [],
-    }));
+    const live = bot.map(botTaskToTask);
     live.forEach((t) => liveIds.add(t.id));
     tasks = [...live, ...tasks.filter((t) => !liveIds.has(t.id))];
     emit();
+    saveTasksCache(tasks);
   } catch {
     hydrated = false; /* бэкенд недоступен — попробуем ещё раз при следующем обращении */
   }
+}
+
+/* "Живое" обновление без перезагрузки страницы: периодический опрос
+   бэкенда (простой, надёжный вариант без веб-сокетов — Vercel serverless
+   функции не держат постоянное соединение, поэтому polling — самый
+   практичный способ получить почти-реальное время без отдельного
+   realtime-сервиса). Плюс мгновенный повторный опрос при возврате на
+   вкладку, чтобы не ждать до конца интервала после долгого отсутствия. */
+let liveSyncStarted = false;
+export function startLiveTasksSync(intervalMs = 7000) {
+  if (liveSyncStarted) return;
+  liveSyncStarted = true;
+
+  const tick = async () => {
+    if (!getSession()) return;
+    try {
+      const bot = await fetchBotTasks();
+      const live = bot.map(botTaskToTask);
+      live.forEach((t) => liveIds.add(t.id));
+      tasks = [...live, ...tasks.filter((t) => !liveIds.has(t.id))];
+      emit();
+      saveTasksCache(tasks);
+    } catch {
+      /* сеть моргнула — попробуем на следующем тике, не критично */
+    }
+  };
+
+  setInterval(() => { void tick(); }, intervalMs);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") void tick();
+  });
+  window.addEventListener("focus", () => void tick());
 }
 
 export function setTaskStatus(id: number, status: TaskStatus) {
