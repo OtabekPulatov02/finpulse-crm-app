@@ -472,3 +472,9 @@ export const fetchBotPositions = () =>
 
 export const saveBotPositions = (positions: string[]) =>
   post<{ ok: boolean; error?: string }>({ action: "bot_positions_save", positions });
+
+export interface AgentMessage { role: "user" | "assistant"; content: string }
+export interface AgentStep { tool: string; args: string; ok: boolean }
+
+export const aiAgent = (messages: AgentMessage[]) =>
+  aiPost<{ ok: boolean; reply: string; steps?: AgentStep[]; error?: string }>({ action: "agent", messages });

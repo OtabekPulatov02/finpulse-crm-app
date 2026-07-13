@@ -1,7 +1,7 @@
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   AlertCircle, BarChart3, Bell, Building2, CalendarDays, CheckCheck, ChevronDown,
-  LayoutDashboard, ListTodo, LogOut, Menu as MenuIcon, Search, Send, Settings, User, Users, X, Database, Sparkles,
+  LayoutDashboard, ListTodo, LogOut, Menu as MenuIcon, Search, Send, Settings, User, Users, X, Database, Sparkles, BotMessageSquare,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Avatar, Menu, MenuDivider, MenuItem, Toaster, toast } from "./ui";
@@ -65,6 +65,7 @@ function SidebarNav({
             </div>
             <NavLink
               to="/integrations"
+              end
               onClick={onNavigate}
               className={({ isActive }) =>
                 `flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
@@ -99,6 +100,20 @@ function SidebarNav({
               <Sparkles className="size-[18px]" />
               AI
             </NavLink>
+            {role === "admin" && (
+              <NavLink
+                to="/ai-chat"
+                onClick={onNavigate}
+                className={({ isActive }) =>
+                  `flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                    isActive ? "bg-violet-50 text-violet-700" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                  }`
+                }
+              >
+                <BotMessageSquare className="size-[18px]" />
+                AI-чат
+              </NavLink>
+            )}
           </>
         )}
       </nav>

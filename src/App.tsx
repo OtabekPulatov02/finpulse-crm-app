@@ -16,6 +16,7 @@ import Settings from "./pages/Settings";
 import Integrations from "./pages/Integrations";
 import Integration1C from "./pages/Integration1C";
 import IntegrationAI from "./pages/IntegrationAI";
+import AiChat from "./pages/AiChat";
 
 export default function App() {
   return (
@@ -44,6 +45,7 @@ export default function App() {
             <Route path="/integrations" element={<Integrations />} />
             <Route path="/integrations/1c" element={<Integration1C />} />
             <Route path="/integrations/ai" element={<IntegrationAI />} />
+            <Route path="/ai-chat" element={<AiChat />} />
           </Route>
         </Route>
       </Route>
