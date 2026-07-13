@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import Layout from "./components/Layout";
+import TopProgressBar from "./components/TopProgressBar";
 import { RequireAuth, RequireClientArea, RequireStaffArea } from "./components/RequireAuth";
 import Login from "./pages/Login";
 import ClientTasks from "./pages/ClientTasks";
@@ -16,7 +17,9 @@ import Integrations from "./pages/Integrations";
 
 export default function App() {
   return (
-    <Routes>
+    <>
+      <TopProgressBar />
+      <Routes>
       <Route path="/login" element={<Login />} />
 
       <Route element={<RequireAuth />}>
@@ -42,6 +45,7 @@ export default function App() {
       </Route>
 
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
-    </Routes>
+      </Routes>
+    </>
   );
 }
