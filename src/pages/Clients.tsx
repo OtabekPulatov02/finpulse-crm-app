@@ -143,10 +143,11 @@ function ClientFormModal({
 }
 
 
-const REQ_LABEL: Record<AccessRequest["type"], string> = {
+const REQ_LABEL: Record<string, string> = {
   phone_mismatch: "Телефон не совпадает с карточкой клиента",
   phone_conflict: "Телефон уже привязан к другой компании",
   telegram_rebind: "Новый Telegram-аккаунт просит доступ к компании",
+  member_approve: "Сотрудник компании просит право отправлять заявки",
 };
 
 function AccessRequestsBlock() {

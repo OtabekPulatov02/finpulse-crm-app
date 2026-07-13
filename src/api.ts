@@ -416,3 +416,19 @@ export const sync1cOrgs = async (app: string) => {
   });
   return r.json() as Promise<{ ok: boolean; created?: number; updated?: number; total?: number; error?: string }>;
 };
+
+/* ---------------- Настройки бота и категории услуг ---------------- */
+export interface BotSettings { slaHours: number; workStart: number; workEnd: number; tzOffset: number }
+export interface BotCategory { id: string; name: string; subs: string[] }
+
+export const fetchBotSettings = () =>
+  get<{ ok: boolean; settings: BotSettings }>("r=bot_settings").then((d) => d.settings);
+
+export const saveBotSettings = (settings: BotSettings) =>
+  post<{ ok: boolean; error?: string }>({ action: "bot_settings_save", settings });
+
+export const fetchBotCategories = () =>
+  get<{ ok: boolean; categories: BotCategory[] | null }>("r=bot_categories").then((d) => d.categories);
+
+export const saveBotCategories = (categories: BotCategory[]) =>
+  post<{ ok: boolean; error?: string }>({ action: "bot_categories_save", categories });

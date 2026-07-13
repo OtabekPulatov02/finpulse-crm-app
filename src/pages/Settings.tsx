@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { BookOpen, Bell, CreditCard, GitBranch, Pencil, Plus, ScrollText, Shield, Tags, Trash2, UserPlus, Users } from "lucide-react";
+import { BookOpen, Bell, Bot as BotIcon, CreditCard, GitBranch, Pencil, Plus, ScrollText, Shield, Tags, Trash2, UserPlus, Users } from "lucide-react";
 import { Avatar, Badge, Card, CardHeader, Toggle, toast, type Tone } from "../components/ui";
-import { fetchLogs, fetchTariffs, saveTariffs, type Tariff } from "../api";
+import { fetchBotCategories, fetchBotSettings, fetchLogs, fetchTariffs, saveBotCategories, saveBotSettings, saveTariffs, type BotCategory, type BotSettings, type Tariff } from "../api";
 import { mapLog, type LogView } from "../lib/logs";
 import { hydrateEmployees, useEmployees } from "../store/employees";
 import { EDITABLE_STATUSES, PRIORITIES, priorityTone, statusTone } from "../data/demo";
@@ -15,6 +15,7 @@ const tabs = [
   { id: "dicts", label: "Справочники", icon: BookOpen },
   { id: "rules", label: "Распределение", icon: GitBranch },
   { id: "tariffs", label: "Тарифы", icon: CreditCard },
+  { id: "bot", label: "Бот", icon: BotIcon },
   { id: "notif", label: "Уведомления", icon: Bell },
   { id: "logs", label: "Логи системы", icon: ScrollText },
 ] as const;
@@ -112,6 +113,99 @@ function TariffsTab() {
         </button>
       </div>
     </Card>
+  );
+}
+
+
+const DEFAULT_BOT_CATS: BotCategory[] = [
+  { id: "pay", name: "💸 Оплатить / платёжка", subs: ["Оплатить счёт поставщика", "Оплата налога", "Перевод между счетами", "Выплата зарплаты"] },
+  { id: "esf", name: "🧾 Счёт-фактура (ЭСФ)", subs: ["Выставить ЭСФ покупателю", "Проверить входящую ЭСФ", "Исправить / аннулировать ЭСФ"] },
+  { id: "sign", name: "✍️ Подписать документ", subs: [] },
+  { id: "akt", name: "🤝 Акт сверки", subs: ["С контрагентом", "С налоговой"] },
+  { id: "dogovor", name: "📄 Договор", subs: ["Подготовить договор", "Проверить договор контрагента"] },
+  { id: "hr", name: "👥 Кадры", subs: ["Принять сотрудника", "Уволить сотрудника", "Отпуск / больничный"] },
+  { id: "report", name: "📊 Отчёты и налоги", subs: ["Сдать отчёт", "Сколько налогов к оплате?", "Справка из налоговой"] },
+  { id: "bank", name: "🏦 Банк / выписка", subs: ["Выписка по счёту", "Открыть / закрыть счёт"] },
+  { id: "consult", name: "💬 Консультация", subs: [] },
+  { id: "other", name: "📝 Другое", subs: [] },
+];
+
+function BotTab() {
+  const [set, setSet] = useState<BotSettings | null>(null);
+  const [cats, setCats] = useState<BotCategory[] | null>(null);
+  const [saving, setSaving] = useState(false);
+  useEffect(() => {
+    fetchBotSettings().then(setSet).catch(() => setSet({ slaHours: 3, workStart: 9, workEnd: 16, tzOffset: 5 }));
+    fetchBotCategories().then((c) => setCats(c ?? DEFAULT_BOT_CATS)).catch(() => setCats(DEFAULT_BOT_CATS));
+  }, []);
+  if (!set || !cats) return <Card><div className="p-8 text-center text-sm text-slate-400">Загрузка настроек бота…</div></Card>;
+
+  const saveAll = async () => {
+    setSaving(true);
+    try {
+      const r1 = await saveBotSettings(set);
+      const r2 = await saveBotCategories(cats);
+      if (r1.ok && r2.ok) toast("Настройки бота сохранены — применяются сразу");
+      else toast(r1.error || r2.error || "Не удалось сохранить");
+    } finally { setSaving(false); }
+  };
+  const numInput = "w-20 rounded-lg border border-slate-200 px-2.5 py-1.5 text-center focus:border-brand-500 focus:outline-none";
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader title="Время работы и SLA" />
+        <div className="grid grid-cols-3 gap-6 p-5 text-[13.5px] max-md:grid-cols-1">
+          <div>
+            <div className="mb-1.5 font-medium">Приём заявок, часы (Ташкент)</div>
+            <div className="flex items-center gap-2">
+              <input className={numInput} value={set.workStart} onChange={(e) => setSet({ ...set, workStart: Number(e.target.value.replace(/\D/g, "")) || 0 })} />
+              <span className="text-slate-400">—</span>
+              <input className={numInput} value={set.workEnd} onChange={(e) => setSet({ ...set, workEnd: Number(e.target.value.replace(/\D/g, "")) || 0 })} />
+            </div>
+            <p className="mt-1.5 text-xs text-slate-400">Вне окна бот предложит «на завтра» или отмену</p>
+          </div>
+          <div>
+            <div className="mb-1.5 font-medium">SLA, часов</div>
+            <input className={numInput} value={set.slaHours} onChange={(e) => setSet({ ...set, slaHours: Number(e.target.value.replace(/\D/g, "")) || 1 })} />
+            <p className="mt-1.5 text-xs text-slate-400">«⏱ Проведём вашу операцию в течение N ч.» после приёма заявки</p>
+          </div>
+          <div>
+            <div className="mb-1.5 font-medium">Доверенные лица</div>
+            <p className="text-xs leading-relaxed text-slate-400">Заявки отправляет владелец номера из карточки клиента или первый зарегистрированный. Остальные — после подтверждения (Telegram или блок «Заявки на доступ» в Клиентах).</p>
+          </div>
+        </div>
+      </Card>
+
+      <Card>
+        <CardHeader title="Категории услуг в боте" action={
+          <button onClick={() => setCats([...cats, { id: "cat" + Date.now().toString(36), name: "Новая категория", subs: [] }])}
+            className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-[12.5px] font-medium hover:bg-slate-50">
+            <Plus className="size-3.5" /> Категория
+          </button>
+        } />
+        <div className="divide-y divide-slate-100">
+          {cats.map((c, i) => (
+            <div key={c.id} className="flex flex-wrap items-start gap-3 px-5 py-3">
+              <input value={c.name} onChange={(e) => setCats(cats.map((x, xi) => xi === i ? { ...x, name: e.target.value } : x))}
+                className="w-56 rounded-lg border border-slate-200 px-2.5 py-1.5 text-[13px] font-medium focus:border-brand-500 focus:outline-none" />
+              <input value={c.subs.join(", ")} placeholder="Подкатегории через запятую (пусто — сразу свободный текст)"
+                onChange={(e) => setCats(cats.map((x, xi) => xi === i ? { ...x, subs: e.target.value.split(",").map((v) => v.trimStart()) } : x))}
+                onBlur={(e) => setCats(cats.map((x, xi) => xi === i ? { ...x, subs: e.target.value.split(",").map((v) => v.trim()).filter(Boolean) } : x))}
+                className="min-w-64 flex-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-[13px] focus:border-brand-500 focus:outline-none" />
+              <button onClick={() => setCats(cats.filter((_, xi) => xi !== i))} className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"><Trash2 className="size-4" /></button>
+            </div>
+          ))}
+        </div>
+        <div className="flex items-center justify-between border-t border-slate-100 px-5 py-3.5">
+          <span className="text-[12.5px] text-slate-400">Клиент видит категории табами при создании заявки. После включения 1С подкатегории дополнятся подсказками из ЭДО (например, «Подписать договор № 14»).</span>
+          <button onClick={saveAll} disabled={saving}
+            className="rounded-lg bg-brand-600 px-4 py-2 text-[13px] font-medium text-white hover:bg-brand-700 disabled:opacity-50">
+            {saving ? "Сохранение…" : "Сохранить"}
+          </button>
+        </div>
+      </Card>
+    </div>
   );
 }
 
@@ -276,6 +370,8 @@ export default function Settings() {
       )}
 
       {tab === "tariffs" && <TariffsTab />}
+
+      {tab === "bot" && <BotTab />}
 
       {tab === "logs" && (
         <Card>
