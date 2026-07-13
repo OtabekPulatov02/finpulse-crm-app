@@ -214,10 +214,10 @@ export async function deleteTaskEverywhere(id: number): Promise<{ ok: boolean; e
 /* Отправка сообщения в чат задачи — уходит в Telegram (клиенту в личку
    или в группу бухгалтеров, в зависимости от роли отправителя) и
    возвращает актуальную ленту с бэкенда, которой обновляем локальный стор. */
-export async function sendMessage(id: number, text: string): Promise<{ ok: boolean; error?: string }> {
+export async function sendMessage(id: number, text: string, file?: File | null): Promise<{ ok: boolean; error?: string }> {
   const clean = text.trim();
-  if (!clean) return { ok: false, error: "text required" };
-  const r = await sendTaskMessageRequest(id, clean);
+  if (!clean && !file) return { ok: false, error: "text required" };
+  const r = await sendTaskMessageRequest(id, clean, file);
   if (!r.ok || !r.task) return { ok: false, error: r.error };
   const t = tasks.find((t) => t.id === id);
   if (t) {
