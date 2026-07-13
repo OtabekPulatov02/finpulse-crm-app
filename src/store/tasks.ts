@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 import {
-  createTaskRequest, deleteTaskRequest, fetchBotTasks, pushBotStatus, updateTaskRequest,
+  createTaskRequest, deleteTaskRequest, fetchBotTasks, pushBotStatus, sendTaskMessageRequest, updateTaskRequest,
   fmtTs, type BotStatus,
 } from "../api";
 import type { Task, TaskStatus } from "../data/demo";
@@ -39,10 +39,10 @@ export function resetTasksStore() {
 }
 
 const fromBotStatus: Record<BotStatus, TaskStatus> = {
-  new: "Новая", in_progress: "В работе", done: "Выполнена",
+  new: "Новая", in_progress: "В работе", done: "Выполнена", cancelled: "Отменено",
 };
 const toBotStatus: Partial<Record<TaskStatus, BotStatus>> = {
-  "Новая": "new", "В работе": "in_progress", "Выполнена": "done",
+  "Новая": "new", "В работе": "in_progress", "Выполнена": "done", "Отменено": "cancelled",
 };
 
 /* "YYYY-MM-DD" → "ДД.ММ" — формат отображения, который уже использует
@@ -64,7 +64,7 @@ export async function hydrateFromBot() {
       id: b.num,
       title: b.text.length > 80 ? b.text.slice(0, 77) + "…" : b.text,
       description: b.text.length > 80 ? b.text : undefined,
-      client: b.company,
+      client: b.company ?? (b.type === "reminder" ? "Все клиенты" : "—"),
       assignee: b.assignee ?? "не назначен",
       status: fromBotStatus[b.status] ?? "Новая",
       priority: "Средний",
@@ -75,6 +75,8 @@ export async function hydrateFromBot() {
       source: b.source === "crm" ? "crm" as const : "bot" as const,
       created: fmtTs(b.createdAt),
       attachments: b.attachments ?? [],
+      type: b.type ?? "task",
+      thread: b.thread ?? [],
     }));
     live.forEach((t) => liveIds.add(t.id));
     tasks = [...live, ...tasks.filter((t) => !liveIds.has(t.id))];
@@ -116,7 +118,7 @@ export function displayStatus(t: Task): TaskStatus {
 /* Просрочена ли задача по дате "due" (формат ДД.ММ). Выполненные и
    заархивированные задачи никогда не считаются просроченными. */
 export function isOverdue(t: Task): boolean {
-  if (t.status === "Выполнена") return false;
+  if (t.status === "Выполнена" || t.status === "Отменено") return false;
   const m = t.due.match(/^(\d{2})\.(\d{2})/);
   if (!m) return false;
   const now = new Date();
@@ -143,7 +145,7 @@ export async function createTask(data: {
     id: b.num,
     title: data.title,
     description: data.description || undefined,
-    client: b.company,
+    client: b.company ?? "—",
     clientId: data.clientId ?? null,
     assignee: b.assignee ?? (data.assignee === "auto" ? "не назначен" : data.assignee),
     status: fromBotStatus[b.status] ?? "Новая",
@@ -154,6 +156,8 @@ export async function createTask(data: {
     fromBot: true,
     source: "crm" as const,
     created: "сегодня",
+    type: b.type ?? "task",
+    thread: [],
   };
   liveIds.add(t.id);
   tasks = [t, ...tasks];
@@ -204,5 +208,22 @@ export async function deleteTaskEverywhere(id: number): Promise<{ ok: boolean; e
     if (!r.ok) return { ok: false, error: r.error };
   }
   removeTask(id);
+  return { ok: true };
+}
+
+/* Отправка сообщения в чат задачи — уходит в Telegram (клиенту в личку
+   или в группу бухгалтеров, в зависимости от роли отправителя) и
+   возвращает актуальную ленту с бэкенда, которой обновляем локальный стор. */
+export async function sendMessage(id: number, text: string): Promise<{ ok: boolean; error?: string }> {
+  const clean = text.trim();
+  if (!clean) return { ok: false, error: "text required" };
+  const r = await sendTaskMessageRequest(id, clean);
+  if (!r.ok || !r.task) return { ok: false, error: r.error };
+  const t = tasks.find((t) => t.id === id);
+  if (t) {
+    t.thread = r.task.thread ?? t.thread ?? [];
+    t.attachments = r.task.attachments ?? t.attachments ?? [];
+    emit();
+  }
   return { ok: true };
 }

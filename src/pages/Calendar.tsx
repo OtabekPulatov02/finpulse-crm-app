@@ -56,7 +56,7 @@ export default function Calendar() {
 
   const events: Ev[] = useMemo(() => {
     const fromTasks: Ev[] = tasks
-      .filter((t) => t.dueDate && t.status !== "Выполнена")
+      .filter((t) => t.dueDate && t.status !== "Выполнена" && t.status !== "Отменено")
       .map((t) => ({
         key: "task:" + t.id, date: parseISODate(t.dueDate!), type: "task" as const,
         title: t.title, company: t.client, repeat: "", remindDays: null, taskNum: t.id,

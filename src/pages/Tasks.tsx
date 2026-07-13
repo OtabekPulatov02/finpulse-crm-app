@@ -12,10 +12,10 @@ import {
   EDITABLE_STATUSES, PRIORITIES, STATUSES,
   priorityTone, statusTone, type Priority, type Task, type TaskStatus,
 } from "../data/demo";
-import { createTask, deleteTaskEverywhere, displayStatus, editTask, isOverdue, setTaskStatus, useTasks } from "../store/tasks";
+import { createTask, deleteTaskEverywhere, displayStatus, editTask, isOverdue, sendMessage, setTaskStatus, useTasks } from "../store/tasks";
 import { hydrateClients, useClients } from "../store/clients";
 import { hydrateEmployees, useEmployees } from "../store/employees";
-import { attachTaskFileRequest, fetchLogs, openTaskFile } from "../api";
+import { attachTaskFileRequest, fetchLogs, fmtTs, openTaskFile } from "../api";
 import { mapLog, type LogView } from "../lib/logs";
 import { formatSumsInText } from "../lib/amount";
 
@@ -25,6 +25,7 @@ const columns: { status: TaskStatus; dot: string; ring: string }[] = [
   { status: "Новая", dot: "bg-violet-500", ring: "ring-violet-300 bg-violet-50/60" },
   { status: "В работе", dot: "bg-brand-500", ring: "ring-brand-300 bg-brand-50/60" },
   { status: "Выполнена", dot: "bg-emerald-500", ring: "ring-emerald-300 bg-emerald-50/60" },
+  { status: "Отменено", dot: "bg-red-500", ring: "ring-red-300 bg-red-50/60" },
   { status: "Архив", dot: "bg-slate-400", ring: "ring-slate-300 bg-slate-100/80" },
 ];
 
@@ -231,20 +232,100 @@ function TaskHistory({ taskId }: { taskId: number }) {
   );
 }
 
+/* ---------------- Чат внутри задачи (YouTrack-style лента) ---------------- */
+
+function TaskChat({ task }: { task: Task }) {
+  const [text, setText] = useState("");
+  const [sending, setSending] = useState(false);
+  const thread = task.thread ?? [];
+  const bottomRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { bottomRef.current?.scrollIntoView({ block: "end" }); }, [thread.length]);
+
+  const send = async () => {
+    const t = text.trim();
+    if (!t || sending) return;
+    setSending(true);
+    try {
+      const r = await sendMessage(task.id, t);
+      if (r.ok) setText("");
+      else toast(r.error || "Не удалось отправить сообщение");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div className="mt-4 border-t border-slate-100 pt-4">
+      <div className="mb-2 text-[11px] font-semibold tracking-wider text-slate-400 uppercase">Чат по задаче</div>
+      <div className="max-h-72 space-y-3 overflow-y-auto rounded-lg border border-slate-100 bg-slate-50/60 p-3">
+        {!thread.length && (
+          <p className="py-4 text-center text-xs text-slate-400">
+            Сообщений пока нет — напишите первым, оно уйдёт клиенту в Telegram.
+          </p>
+        )}
+        {thread.map((m) => (
+          <div key={m.id} className={`flex ${m.from === "staff" ? "justify-end" : "justify-start"}`}>
+            <div className={`max-w-[80%] rounded-xl px-3 py-2 text-[13px] leading-snug ${
+              m.from === "staff" ? "bg-brand-600 text-white" : "border border-slate-200 bg-white text-slate-700"}`}>
+              <div className={`mb-0.5 text-[11px] font-semibold ${m.from === "staff" ? "text-brand-100" : "text-slate-400"}`}>{m.by}</div>
+              {m.text && <div className="whitespace-pre-wrap">{m.text}</div>}
+              {m.fileIndex != null && (
+                <button type="button"
+                  onClick={() => openTaskFile(task.id, m.fileIndex as number).catch(() => toast("Не удалось открыть файл"))}
+                  className={`mt-1.5 flex items-center gap-1.5 rounded-md px-2 py-1 text-[12px] font-medium ${
+                    m.from === "staff" ? "bg-white/15 hover:bg-white/25" : "bg-slate-100 hover:bg-slate-200"}`}>
+                  <Paperclip className="size-3.5" /> Вложение
+                </button>
+              )}
+              <div className={`mt-1 text-right text-[10px] ${m.from === "staff" ? "text-brand-100/80" : "text-slate-400"}`}>{fmtTs(m.at)}</div>
+            </div>
+          </div>
+        ))}
+        <div ref={bottomRef} />
+      </div>
+      <div className="mt-2 flex items-end gap-2">
+        <Textarea value={text} onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(); } }}
+          placeholder="Написать сообщение — уйдёт в Telegram" rows={2} className="flex-1" />
+        <button type="button" disabled={sending || !text.trim()} onClick={send}
+          className="flex h-full items-center gap-1.5 self-stretch rounded-lg bg-brand-600 px-3.5 text-[13px] font-medium text-white hover:bg-brand-700 disabled:opacity-50">
+          <Send className="size-4" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function TaskViewModal({
   task, onClose, onEdit, onDelete,
 }: { task: Task | null; onClose: () => void; onEdit: (t: Task) => void; onDelete: (t: Task) => void }) {
   if (!task) return null;
   const src = sourceLabel(task);
+  const isCancelled = task.status === "Отменено";
+  const isDone = task.status === "Выполнена";
   return (
     <Modal open onClose={onClose} title={`Задача № ${task.id}`} wide
       footer={
         <>
-          {task.status !== "Выполнена" && (
+          {!isDone && !isCancelled && (
             <button
               onClick={() => { setTaskStatus(task.id, "Выполнена"); toast("Статус обновлён — задача выполнена"); onClose(); }}
               className="mr-auto flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-[13px] font-medium text-white hover:bg-emerald-700">
               <Check className="size-4" /> Выполнена
+            </button>
+          )}
+          {!isCancelled && !isDone && (
+            <button
+              onClick={() => { setTaskStatus(task.id, "Отменено"); toast("Задача отменена"); onClose(); }}
+              className={`flex items-center gap-1.5 rounded-lg border border-red-200 px-3.5 py-2 text-[13px] font-medium text-red-600 hover:bg-red-50 ${isDone ? "" : "mr-auto"}`}>
+              <X className="size-4" /> Отменить
+            </button>
+          )}
+          {isCancelled && (
+            <button
+              onClick={() => { setTaskStatus(task.id, "Новая"); toast("Задача возобновлена"); onClose(); }}
+              className="mr-auto flex items-center gap-1.5 rounded-lg border border-slate-200 px-3.5 py-2 text-[13px] font-medium text-slate-600 hover:bg-slate-50">
+              <RotateCcw className="size-4" /> Возобновить
             </button>
           )}
           <button onClick={() => { onClose(); onDelete(task); }}
@@ -261,6 +342,7 @@ function TaskViewModal({
         <Badge tone={statusTone[displayStatus(task)]}>{displayStatus(task)}</Badge>
         <Badge tone={priorityTone[task.priority]}>{task.priority} приоритет</Badge>
         {src && <Badge tone="cyan">{src}</Badge>}
+        {task.type === "reminder" && <Badge tone="purple">напоминание</Badge>}
         {isOverdue(task) && <Badge tone="red">просрочена</Badge>}
       </div>
       <h3 className="text-lg leading-snug font-bold">{task.title}</h3>
@@ -269,7 +351,9 @@ function TaskViewModal({
       )}
       <dl className="mt-5 grid grid-cols-[130px_1fr] gap-x-4 gap-y-2.5 border-t border-slate-100 pt-4 text-[13.5px]">
         <dt className="text-slate-400">Клиент</dt>
-        <dd className="font-medium text-brand-600">{task.client}</dd>
+        <dd className={task.client && task.client !== "—" ? "font-medium text-brand-600" : "text-slate-400 italic"}>
+          {task.client && task.client !== "—" ? task.client : "Без компании"}
+        </dd>
         <dt className="text-slate-400">Исполнитель</dt>
         <dd className="flex items-center gap-2"><Avatar name={task.assignee} className="!size-6 !text-[10px]" />{task.assignee}</dd>
         <dt className="text-slate-400">Постановщик</dt>
@@ -279,6 +363,24 @@ function TaskViewModal({
         <dt className="text-slate-400">Дедлайн</dt>
         <dd className={`font-semibold ${isOverdue(task) ? "text-red-600" : ""}`}>{task.due}</dd>
       </dl>
+      {!!task.attachments?.length && (
+        <div className="mt-4 border-t border-slate-100 pt-4">
+          <div className="mb-1.5 text-[11px] font-semibold tracking-wider text-slate-400 uppercase">Вложения</div>
+          <div className="flex flex-wrap gap-2">
+            {task.attachments.map((a) => (
+              <button
+                key={a.index}
+                type="button"
+                onClick={() => openTaskFile(task.id, a.index).catch(() => toast("Не удалось открыть файл"))}
+                className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[13px] font-medium text-slate-600 hover:border-brand-400 hover:text-brand-600"
+              >
+                <Paperclip className="size-3.5" /> Вложение {a.index + 1}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      <TaskChat task={task} />
       <div className="mt-4 border-t border-slate-100 pt-4">
         <div className="mb-1.5 text-[11px] font-semibold tracking-wider text-slate-400 uppercase">История</div>
         <TaskHistory taskId={task.id} />
@@ -295,7 +397,12 @@ export default function Tasks() {
   useEffect(() => { void hydrateEmployees(); }, []);
   const [view, setView] = useState<"kanban" | "table">("kanban");
 
-  const [viewTask, setViewTask] = useState<Task | null>(null);
+  const [viewTaskId, setViewTaskId] = useState<number | null>(null);
+  /* Берём саму задачу из живого стора по id, а не храним снимок объекта —
+     иначе после отправки сообщения в чат (или любого другого обновления
+     задачи) открытая модалка продолжала бы показывать устаревшую ленту. */
+  const viewTask = viewTaskId != null ? (tasks.find((t) => t.id === viewTaskId) ?? null) : null;
+  const setViewTask = (t: Task | null) => setViewTaskId(t ? t.id : null);
   const [editTask, setEditTask] = useState<Task | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [createStatus, setCreateStatus] = useState<TaskStatus>("Новая");
@@ -308,7 +415,7 @@ export default function Tasks() {
     const openId = searchParams.get("open");
     if (!openId || !tasks.length) return;
     const t = tasks.find((t) => t.id === Number(openId));
-    if (t) setViewTask(t);
+    if (t) setViewTaskId(t.id);
     setSearchParams((p) => { p.delete("open"); return p; }, { replace: true });
   }, [searchParams, tasks, setSearchParams]);
 
@@ -375,7 +482,7 @@ export default function Tasks() {
 
       {/* ---------- КАНБАН ---------- */}
       {view === "kanban" && (
-        <div className="grid grid-cols-4 items-start gap-3.5 overflow-x-auto pb-2 max-xl:grid-cols-[repeat(4,270px)]">
+        <div className="grid grid-cols-5 items-start gap-3.5 overflow-x-auto pb-2 max-xl:grid-cols-[repeat(5,270px)]">
           {columns.map(({ status, dot, ring }) => {
             const items = tasks.filter((t) => displayStatus(t) === status);
             const isOver = overCol === status && dragTask?.status !== status;
@@ -408,8 +515,9 @@ export default function Tasks() {
                         onClick={() => setViewTask(t)}
                         className={`cursor-grab border-l-[3px] p-3 transition select-none active:cursor-grabbing ${prioBorder[t.priority]} ${
                           dragId === t.id ? "rotate-1 opacity-40 shadow-lg" : "hover:-translate-y-0.5 hover:shadow-md"}`}>
-                        <div className="flex items-center gap-1 text-[11px] font-medium text-slate-400">
+                        <div className="flex items-center gap-1.5 text-[11px] font-medium text-slate-400">
                           <Hash className="size-3" />{t.id}
+                          {t.type === "reminder" && <Badge tone="cyan">напоминание</Badge>}
                         </div>
                         <div className="mt-0.5 line-clamp-2 text-[13px] leading-snug font-semibold">{t.title}</div>
                         <div className="mt-1 truncate text-xs text-slate-400">{t.client}</div>
@@ -417,6 +525,7 @@ export default function Tasks() {
                           <span className={`flex items-center gap-1.5 text-[11px] ${isOverdue(t) ? "font-semibold text-red-500" : "text-slate-400"}`}>
                             {status === "Архив" ? <Archive className="size-3" />
                               : status === "Выполнена" ? <Check className="size-3 text-emerald-500" />
+                              : status === "Отменено" ? <X className="size-3 text-red-500" />
                               : <Calendar className="size-3" />}
                             {t.due}
                             {src === "из Telegram" && <Send className="size-3 text-cyan-500" />}
@@ -497,7 +606,8 @@ export default function Tasks() {
                             className={`cursor-pointer rounded-full border py-1 pr-7 pl-3 text-xs font-medium focus:outline-none ${
                               { "Новая": "border-violet-200 bg-violet-50 text-violet-700",
                                 "В работе": "border-brand-200 bg-brand-50 text-brand-700",
-                                "Выполнена": "border-emerald-200 bg-emerald-50 text-emerald-700" }[t.status as "Новая" | "В работе" | "Выполнена"]}`}>
+                                "Выполнена": "border-emerald-200 bg-emerald-50 text-emerald-700",
+                                "Отменено": "border-red-200 bg-red-50 text-red-700" }[t.status as "Новая" | "В работе" | "Выполнена" | "Отменено"]}`}>
                             {EDITABLE_STATUSES.map((s) => <option key={s}>{s}</option>)}
                           </select>
                         )}
@@ -512,10 +622,15 @@ export default function Tasks() {
                         }>
                           <MenuItem icon={<ExternalLink className="size-4" />} onClick={() => setViewTask(t)}>Открыть</MenuItem>
                           <MenuItem icon={<Pencil className="size-4" />} onClick={() => openEdit(t)}>Изменить</MenuItem>
-                          {displayStatus(t) === "Архив" ? (
+                          {displayStatus(t) === "Архив" || t.status === "Отменено" ? (
                             <MenuItem icon={<RotateCcw className="size-4" />} onClick={() => { setTaskStatus(t.id, "В работе"); toast("Задача возобновлена — статус «В работе»"); }}>Возобновить</MenuItem>
-                          ) : t.status !== "Выполнена" && (
-                            <MenuItem icon={<Check className="size-4" />} onClick={() => { setTaskStatus(t.id, "Выполнена"); toast("Задача отмечена выполненной"); }}>Выполнена</MenuItem>
+                          ) : (
+                            <>
+                              {t.status !== "Выполнена" && (
+                                <MenuItem icon={<Check className="size-4" />} onClick={() => { setTaskStatus(t.id, "Выполнена"); toast("Задача отмечена выполненной"); }}>Выполнена</MenuItem>
+                              )}
+                              <MenuItem icon={<X className="size-4" />} onClick={() => { setTaskStatus(t.id, "Отменено"); toast("Задача отменена"); }}>Отменить</MenuItem>
+                            </>
                           )}
                           <MenuDivider />
                           <MenuItem danger icon={<Trash2 className="size-4" />} onClick={() => setDeleteTaskT(t)}>Удалить</MenuItem>
