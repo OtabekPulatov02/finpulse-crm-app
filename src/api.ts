@@ -60,6 +60,14 @@ export interface CrmClient {
   tariff: string | null;
   note: string | null;
   inn?: string | null;
+  fullName?: string | null;
+  pinfl?: string | null;
+  vatCode?: string | null;
+  taxSystem?: string | null;
+  bank?: string | null;
+  director?: string | null;
+  taxOffice?: string | null;
+  source1c?: { app: string; ref: string; name: string } | null;
   mfo?: string | null;
   bankAccount?: string | null;
   address?: string | null;
@@ -172,7 +180,7 @@ export const createClientRequest = (data: {
 }) => post<ClientResult>({ action: "client_create", ...data });
 
 export const updateClientRequest = (id: string, patch: Partial<Pick<CrmClient,
-  "status" | "assignedTo" | "tariff" | "note" | "position" | "inn" | "mfo" | "bankAccount" | "address"
+  "status" | "assignedTo" | "tariff" | "note" | "position" | "inn" | "mfo" | "bankAccount" | "address" | "fullName" | "pinfl" | "vatCode" | "taxSystem" | "bank" | "director" | "taxOffice"
 >>) => post<ClientResult>({ action: "client_update", id, patch });
 
 export const deleteClientRequest = (id: string) =>
@@ -351,3 +359,60 @@ export function fmtTs(ts?: string | null): string {
   if (isNaN(+d)) return ts;
   return d.toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 }
+
+/* ---------------- Тарифы и лимиты операций ---------------- */
+export interface Tariff {
+  id: string;
+  name: string;
+  price: number | null;
+  monthlyLimit: number | null;
+  overPackOps: number | null;
+  overPackPrice: number | null;
+}
+export interface ClientUsage {
+  used: number;
+  limit: number | null;
+  baseLimit: number | null;
+  extraPacks: number;
+  tariffName: string | null;
+  over: boolean;
+}
+
+export const fetchTariffs = () =>
+  get<{ ok: boolean; tariffs: Tariff[] }>("r=tariffs").then((d) => d.tariffs ?? []);
+
+export const saveTariffs = (tariffs: Tariff[]) =>
+  post<{ ok: boolean; tariffs?: Tariff[]; error?: string }>({ action: "tariffs_save", tariffs });
+
+export const fetchUsage = () =>
+  get<{ ok: boolean; usage: Record<string, ClientUsage> }>("r=usage").then((d) => d.usage ?? {});
+
+export const addOpsPack = (clientId: string, packs = 1) =>
+  post<{ ok: boolean; packs?: number; error?: string }>({ action: "ops_pack_add", clientId, packs });
+
+/* ---------------- 1С (Clobus) ---------------- */
+const API_1C = `${ORIGIN}/api/1c`;
+
+export interface App1C {
+  code: string; path: string; name: string;
+  reachable?: boolean; entities?: number | null; ready?: boolean; error?: string;
+}
+
+async function get1c<T>(params: string): Promise<T> {
+  const r = await fetch(`${API_1C}?${params}`, { signal: AbortSignal.timeout(25000), headers: authHeaders() });
+  if (!r.ok && r.status !== 401) throw new Error(`HTTP ${r.status}`);
+  return r.json();
+}
+
+export const fetch1cPing = () =>
+  get1c<{ ok: boolean; apps?: App1C[]; error?: string }>("r=ping");
+
+export const sync1cOrgs = async (app: string) => {
+  const r = await fetch(API_1C, {
+    method: "POST",
+    headers: { "content-type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ action: "sync_orgs", app }),
+    signal: AbortSignal.timeout(30000),
+  });
+  return r.json() as Promise<{ ok: boolean; created?: number; updated?: number; total?: number; error?: string }>;
+};

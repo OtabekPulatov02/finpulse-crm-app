@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
-  Archive, CheckCircle2, ExternalLink, MoreHorizontal, Pencil, Plus, Search, ShieldAlert, Trash2, UserPlus,
+  Archive, CheckCircle2, ExternalLink, MoreHorizontal, PackagePlus, Pencil, Plus, Search, ShieldAlert, Trash2, UserPlus,
 } from "lucide-react";
 import {
   Avatar, Badge, Card, ConfirmModal, Field, Input, Menu, MenuDivider,
@@ -9,7 +9,7 @@ import {
 } from "../components/ui";
 import { useEmployees, hydrateEmployees } from "../store/employees";
 import type { AccessRequest, CrmClient } from "../api";
-import { fetchAccessRequests, resolveAccessRequest } from "../api";
+import { fetchAccessRequests, resolveAccessRequest, addOpsPack, fetchTariffs, fetchUsage, type ClientUsage, type Tariff } from "../api";
 import { createClient, hydrateClients, patchClient, removeClient, useClients } from "../store/clients";
 import { formatPhone } from "../lib/phone";
 import { formatSumsInText } from "../lib/amount";
@@ -22,11 +22,9 @@ const statusTone: Record<string, Tone> = {
 };
 const STATUSES = ["active", "pending", "archived"];
 
-const TARIFFS = ["Стандарт", "Расширенный", "Премиум"];
-
 function ClientFormModal({
-  open, onClose, client,
-}: { open: boolean; onClose: () => void; client?: CrmClient | null }) {
+  open, onClose, client, tariffNames,
+}: { open: boolean; onClose: () => void; client?: CrmClient | null; tariffNames: string[] }) {
   const employees = useEmployees();
   useEffect(() => { void hydrateEmployees(); }, []);
   const employeeNames = employees.filter((e) => e.active).map((e) => e.name);
@@ -34,13 +32,20 @@ function ClientFormModal({
   const [company, setCompany] = useState(client?.company ?? "");
   const [phone, setPhone] = useState(edit ? formatPhone(client?.phone ?? "") : "");
   const [position, setPosition] = useState(client?.position ?? "");
-  const [tariff, setTariff] = useState(client?.tariff ?? TARIFFS[0]);
+  const [tariff, setTariff] = useState(client?.tariff ?? tariffNames[0] ?? "");
   const [assignedTo, setAssignedTo] = useState(client?.assignedTo ?? employeeNames[0] ?? "");
   const [note, setNote] = useState(client?.note ?? "");
   const [inn, setInn] = useState(client?.inn ?? "");
   const [mfo, setMfo] = useState(client?.mfo ?? "");
   const [bankAccount, setBankAccount] = useState(client?.bankAccount ?? "");
   const [address, setAddress] = useState(client?.address ?? "");
+  const [fullName, setFullName] = useState(client?.fullName ?? "");
+  const [pinfl, setPinfl] = useState(client?.pinfl ?? "");
+  const [vatCode, setVatCode] = useState(client?.vatCode ?? "");
+  const [taxSystem, setTaxSystem] = useState(client?.taxSystem ?? "");
+  const [bank, setBank] = useState(client?.bank ?? "");
+  const [director, setDirector] = useState(client?.director ?? "");
+  const [taxOffice, setTaxOffice] = useState(client?.taxOffice ?? "");
   const [saving, setSaving] = useState(false);
 
   const submit = async () => {
@@ -51,6 +56,8 @@ function ClientFormModal({
         const r = await patchClient(client.id, {
           position: position || null, tariff: tariff || null, assignedTo: assignedTo || null, note: note || null,
           inn: inn || null, mfo: mfo || null, bankAccount: bankAccount || null, address: address || null,
+          fullName: fullName || null, pinfl: pinfl || null, vatCode: vatCode || null, taxSystem: taxSystem || null,
+          bank: bank || null, director: director || null, taxOffice: taxOffice || null,
         });
         if (!r.ok) { toast(r.error || "Не удалось сохранить изменения"); return; }
         toast("Данные клиента обновлены");
@@ -87,7 +94,7 @@ function ClientFormModal({
         </div>
         <div className="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
           <Field label="Тариф">
-            <Select value={tariff} onChange={(e) => setTariff(e.target.value)}>{TARIFFS.map((t) => <option key={t}>{t}</option>)}</Select>
+            <Select value={tariff} onChange={(e) => setTariff(e.target.value)}>{(tariffNames.length ? tariffNames : [tariff]).map((t) => <option key={t}>{t}</option>)}</Select>
           </Field>
           <Field label="Ответственный бухгалтер">
             <Select value={assignedTo} onChange={(e) => setAssignedTo(e.target.value)}>
@@ -107,6 +114,26 @@ function ClientFormModal({
             <div className="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
               <Field label="Расчётный счёт"><Input value={bankAccount} onChange={(e) => setBankAccount(e.target.value)} placeholder="2020 8000 ..." /></Field>
               <Field label="Юридический адрес"><Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="г. Ташкент, ..." /></Field>
+            </div>
+            <div className="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
+              <Field label="Полное наименование (1С)"><Input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="«…» Mas'uliyati Cheklangan Jamiyati" /></Field>
+              <Field label="ПИНФЛ"><Input value={pinfl} onChange={(e) => setPinfl(e.target.value)} placeholder="14 цифр" /></Field>
+            </div>
+            <div className="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
+              <Field label="Рег. код НДС"><Input value={vatCode} onChange={(e) => setVatCode(e.target.value)} placeholder="326…" /></Field>
+              <Field label="Система налогообложения">
+                <Select value={taxSystem} onChange={(e) => setTaxSystem(e.target.value)}>
+                  <option value="">—</option><option>Общеустановленная (НДС)</option><option>Упрощённая (налог с оборота)</option><option>Фиксированный налог ИП</option>
+                </Select>
+              </Field>
+            </div>
+            <div className="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
+              <Field label="Банк"><Input value={bank} onChange={(e) => setBank(e.target.value)} placeholder="«Orient Finans» XATB …" /></Field>
+              <Field label="Директор"><Input value={director} onChange={(e) => setDirector(e.target.value)} placeholder="ФИО" /></Field>
+            </div>
+            <div className="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
+              <Field label="Налоговая инспекция (код)"><Input value={taxOffice} onChange={(e) => setTaxOffice(e.target.value)} placeholder="2603" /></Field>
+              {client?.source1c && <Field label="Источник 1С"><Input value={client.source1c.name + " · " + client.source1c.app} disabled /></Field>}
             </div>
           </>
         )}
@@ -179,6 +206,13 @@ function AccessRequestsBlock() {
 export default function Clients() {
   const clients = useClients();
   useEffect(() => { void hydrateClients(); }, []);
+  const [usage, setUsage] = useState<Record<string, ClientUsage>>({});
+  const [tariffList, setTariffList] = useState<Tariff[]>([]);
+  useEffect(() => {
+    fetchUsage().then(setUsage).catch(() => {});
+    fetchTariffs().then(setTariffList).catch(() => {});
+  }, []);
+  const tariffNames = tariffList.map((t) => t.name);
 
   const [q, setQ] = useState("");
   const [fStatus, setFStatus] = useState("Все статусы");
@@ -259,7 +293,16 @@ export default function Clients() {
                       <span className="flex items-center gap-2"><Avatar name={c.assignedTo} />{c.assignedTo}</span>
                     )}
                   </td>
-                  <td className="px-4 py-3">{c.tariff || "—"}</td>
+                  <td className="px-4 py-3">
+                    <div>{c.tariff || "—"}</div>
+                    {usage[c.id] && (
+                      <div className={`mt-0.5 text-[11px] ${usage[c.id].over ? "font-semibold text-red-600" : "text-slate-400"}`}>
+                        {usage[c.id].used}/{usage[c.id].limit == null ? "∞" : usage[c.id].limit} опер.
+                        {usage[c.id].extraPacks > 0 && ` · +${usage[c.id].extraPacks} пак.`}
+                        {usage[c.id].over && " · сверхлимит!"}
+                      </div>
+                    )}
+                  </td>
                   <td className="px-4 py-3"><Badge tone={statusTone[c.status] ?? "gray"}>{STATUS_LABEL[c.status] ?? c.status}</Badge></td>
                   <td className="px-4 py-3 text-right">
                     <Menu trigger={
@@ -276,6 +319,14 @@ export default function Clients() {
                       )}
                       <MenuItem icon={<Pencil className="size-4" />} onClick={() => setEditClient(c)}>Изменить</MenuItem>
                       <MenuItem icon={<UserPlus className="size-4" />} onClick={() => setEditClient(c)}>Сменить ответственного</MenuItem>
+                      <MenuItem icon={<PackagePlus className="size-4" />}
+                        onClick={async () => {
+                          const r = await addOpsPack(c.id, 1);
+                          if (r.ok) { toast(`Пакет сверхлимита добавлен (всего в этом месяце: ${r.packs})`); fetchUsage().then(setUsage).catch(() => {}); }
+                          else toast(r.error || "Не удалось добавить пакет");
+                        }}>
+                        + Пакет операций
+                      </MenuItem>
                       <MenuDivider />
                       {c.status !== "archived" && (
                         <MenuItem icon={<Archive className="size-4" />} onClick={() => setArchiveClient(c)}>Архивировать</MenuItem>
@@ -293,8 +344,8 @@ export default function Clients() {
         </div>
       </Card>
 
-      <ClientFormModal open={createOpen} onClose={() => setCreateOpen(false)} />
-      {editClient && <ClientFormModal open onClose={() => setEditClient(null)} client={editClient} />}
+      <ClientFormModal open={createOpen} onClose={() => setCreateOpen(false)} tariffNames={tariffNames} />
+      {editClient && <ClientFormModal open onClose={() => setEditClient(null)} client={editClient} tariffNames={tariffNames} />}
       <ConfirmModal
         open={!!archiveClient}
         onClose={() => setArchiveClient(null)}

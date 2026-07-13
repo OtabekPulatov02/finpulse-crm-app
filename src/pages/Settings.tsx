@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { BookOpen, Bell, GitBranch, Pencil, Plus, ScrollText, Shield, Tags, UserPlus, Users } from "lucide-react";
+import { BookOpen, Bell, CreditCard, GitBranch, Pencil, Plus, ScrollText, Shield, Tags, Trash2, UserPlus, Users } from "lucide-react";
 import { Avatar, Badge, Card, CardHeader, Toggle, toast, type Tone } from "../components/ui";
-import { fetchLogs } from "../api";
+import { fetchLogs, fetchTariffs, saveTariffs, type Tariff } from "../api";
 import { mapLog, type LogView } from "../lib/logs";
 import { hydrateEmployees, useEmployees } from "../store/employees";
 import { EDITABLE_STATUSES, PRIORITIES, priorityTone, statusTone } from "../data/demo";
@@ -14,6 +14,7 @@ const tabs = [
   { id: "statuses", label: "Статусы", icon: Tags },
   { id: "dicts", label: "Справочники", icon: BookOpen },
   { id: "rules", label: "Распределение", icon: GitBranch },
+  { id: "tariffs", label: "Тарифы", icon: CreditCard },
   { id: "notif", label: "Уведомления", icon: Bell },
   { id: "logs", label: "Логи системы", icon: ScrollText },
 ] as const;
@@ -45,6 +46,74 @@ function DictCard({ title, items, placeholder }: { title: string; items: { label
 
 const ROLE_LABEL: Record<string, string> = { admin: "Администратор", accountant: "Бухгалтер" };
 const ROLE_TONE: Record<string, Tone> = { admin: "purple", accountant: "blue" };
+
+
+function TariffsTab() {
+  const [rows, setRows] = useState<Tariff[] | null>(null);
+  const [saving, setSaving] = useState(false);
+  useEffect(() => { fetchTariffs().then(setRows).catch(() => setRows([])); }, []);
+  if (!rows) return <Card><div className="p-8 text-center text-sm text-slate-400">Загрузка тарифов…</div></Card>;
+
+  const upd = (i: number, k: keyof Tariff, v: string) =>
+    setRows((r) => r!.map((t, idx) => idx === i ? { ...t, [k]: k === "name" ? v : v === "" ? null : Number(v.replace(/\D/g, "")) } : t));
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      const r = await saveTariffs(rows);
+      if (r.ok) toast("Тарифы сохранены — лимиты применяются со следующего пересчёта");
+      else toast(r.error || "Не удалось сохранить");
+    } finally { setSaving(false); }
+  };
+
+  const num = (v: number | null) => (v == null ? "" : String(v));
+
+  return (
+    <Card>
+      <CardHeader title="Тарифы и лимиты операций" action={
+        <button onClick={() => setRows((r) => [...r!, { id: "t" + Date.now().toString(36), name: "Новый тариф", price: 0, monthlyLimit: 30, overPackOps: 10, overPackPrice: 0 }])}
+          className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-[12.5px] font-medium hover:bg-slate-50">
+          <Plus className="size-3.5" /> Добавить тариф
+        </button>
+      } />
+      <div className="overflow-x-auto">
+        <table className="w-full text-[13px]">
+          <thead>
+            <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold tracking-wider text-slate-400 uppercase">
+              <th className="px-4 py-3">Название</th>
+              <th className="px-4 py-3">Цена, сум/мес</th>
+              <th className="px-4 py-3">Лимит операций/мес</th>
+              <th className="px-4 py-3">Пакет сверхлимита, опер.</th>
+              <th className="px-4 py-3">Цена пакета, сум</th>
+              <th className="px-4 py-3" />
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {rows.map((t, i) => (
+              <tr key={t.id}>
+                <td className="px-4 py-2"><input value={t.name} onChange={(e) => upd(i, "name", e.target.value)} className="w-36 rounded-lg border border-slate-200 px-2.5 py-1.5 focus:border-brand-500 focus:outline-none" /></td>
+                <td className="px-4 py-2"><input value={num(t.price)} onChange={(e) => upd(i, "price", e.target.value)} className="w-28 rounded-lg border border-slate-200 px-2.5 py-1.5 focus:border-brand-500 focus:outline-none" /></td>
+                <td className="px-4 py-2"><input value={num(t.monthlyLimit)} onChange={(e) => upd(i, "monthlyLimit", e.target.value)} placeholder="∞" className="w-24 rounded-lg border border-slate-200 px-2.5 py-1.5 focus:border-brand-500 focus:outline-none" /></td>
+                <td className="px-4 py-2"><input value={num(t.overPackOps)} onChange={(e) => upd(i, "overPackOps", e.target.value)} placeholder="—" className="w-24 rounded-lg border border-slate-200 px-2.5 py-1.5 focus:border-brand-500 focus:outline-none" /></td>
+                <td className="px-4 py-2"><input value={num(t.overPackPrice)} onChange={(e) => upd(i, "overPackPrice", e.target.value)} placeholder="—" className="w-28 rounded-lg border border-slate-200 px-2.5 py-1.5 focus:border-brand-500 focus:outline-none" /></td>
+                <td className="px-4 py-2 text-right">
+                  <button onClick={() => setRows((r) => r!.filter((_, idx) => idx !== i))} className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"><Trash2 className="size-4" /></button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="flex items-center justify-between border-t border-slate-100 px-5 py-3.5">
+        <span className="text-[12.5px] text-slate-400">Пустой лимит = безлимит. «Операция» — выполненная задача клиента за календарный месяц. Пакеты докупаются в карточке клиента.</span>
+        <button onClick={save} disabled={saving}
+          className="rounded-lg bg-brand-600 px-4 py-2 text-[13px] font-medium text-white hover:bg-brand-700 disabled:opacity-50">
+          {saving ? "Сохранение…" : "Сохранить"}
+        </button>
+      </div>
+    </Card>
+  );
+}
 
 export default function Settings() {
   const [tab, setTab] = useState<TabId>("users");
@@ -205,6 +274,8 @@ export default function Settings() {
           ))}
         </Card>
       )}
+
+      {tab === "tariffs" && <TariffsTab />}
 
       {tab === "logs" && (
         <Card>
