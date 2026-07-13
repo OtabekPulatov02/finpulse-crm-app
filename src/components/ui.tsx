@@ -55,19 +55,20 @@ import { X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 export function Modal({
-  open, onClose, title, children, footer, wide,
+  open, onClose, title, children, footer, wide, size,
 }: {
   open: boolean; onClose: () => void; title: string;
-  children: ReactNode; footer?: ReactNode; wide?: boolean;
+  children: ReactNode; footer?: ReactNode; wide?: boolean; size?: "md" | "lg" | "xl";
 }) {
   if (!open) return null;
+  const maxW = size === "xl" ? "max-w-4xl" : size === "lg" ? "max-w-3xl" : wide ? "max-w-2xl" : "max-w-lg";
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 p-5 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
-        className={`flex max-h-[calc(100vh-3rem)] w-full flex-col rounded-xl bg-white shadow-2xl ${wide ? "max-w-2xl" : "max-w-lg"}`}
+        className={`flex max-h-[calc(100vh-3rem)] w-full flex-col rounded-xl bg-white shadow-2xl ${maxW}`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">

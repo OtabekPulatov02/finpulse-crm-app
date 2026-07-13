@@ -40,7 +40,7 @@ export default function TaskDetailPage() {
         className="flex items-center gap-1.5 text-[13px] font-medium text-slate-500 hover:text-brand-600">
         <ArrowLeft className="size-4" /> К списку задач
       </button>
-      <Card className="mx-auto max-w-2xl p-5">
+      <Card className="mx-auto max-w-4xl p-5">
         <TaskDetailBody task={task} />
         <div className="mt-5 flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-4">
           <TaskDetailActions

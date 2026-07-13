@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
-  Archive, Calendar, Check, ExternalLink, Hash, Kanban, LayoutList, MoreHorizontal,
+  Archive, Calendar, Check, Copy, ExternalLink, Hash, Kanban, LayoutList, MoreHorizontal,
   Paperclip, Pencil, Plus, RotateCcw, Search, Send, Trash2, X,
 } from "lucide-react";
 import {
@@ -318,64 +318,111 @@ function TaskChat({ task }: { task: Task }) {
    просмотра, и на отдельной странице (/tasks/:id), чтобы не дублировать
    разметку. showOpenLink добавляет ссылку "открыть на отдельной странице"
    (её незачем показывать, когда мы уже на этой странице). */
+/* Небольшое поле в боковой панели (лейбл сверху, значение снизу) —
+   тот же паттерн, что в YouTrack (Project/Priority/Assignee и т.д.). */
+function InfoField({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div>
+      <div className="text-[11px] font-medium tracking-wide text-slate-400 uppercase">{label}</div>
+      <div className="mt-1 text-[13.5px] text-slate-700">{children}</div>
+    </div>
+  );
+}
+
+async function copyTaskRef(task: Task) {
+  const text = `№${task.id} ${task.title}`;
+  try {
+    await navigator.clipboard.writeText(text);
+    toast("Скопировано в буфер обмена");
+  } catch {
+    toast("Не удалось скопировать");
+  }
+}
+
 export function TaskDetailBody({ task, showOpenLink }: { task: Task; showOpenLink?: boolean }) {
   const src = sourceLabel(task);
+  const thread = task.thread ?? [];
+  const [tab, setTab] = useState<"chat" | "history">("chat");
+
   return (
-    <>
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <Badge tone={statusTone[displayStatus(task)]}>{displayStatus(task)}</Badge>
-        <Badge tone={priorityTone[task.priority]}>{task.priority} приоритет</Badge>
-        {src && <Badge tone="cyan">{src}</Badge>}
-        {task.type === "reminder" && <Badge tone="purple">напоминание</Badge>}
-        {isOverdue(task) && <Badge tone="red">просрочена</Badge>}
-        {showOpenLink && (
-          <Link to={`/tasks/${task.id}`}
-            className="ml-auto flex items-center gap-1 text-[12px] font-medium text-slate-400 hover:text-brand-600">
-            <ExternalLink className="size-3.5" /> На отдельной странице
-          </Link>
+    <div className="grid gap-5 md:grid-cols-[1fr_220px]">
+      <div className="min-w-0">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <button type="button" onClick={() => void copyTaskRef(task)} title="Скопировать номер и название задачи"
+            className="group flex items-center gap-1.5 rounded-md py-0.5 text-[13px] font-semibold text-slate-500 transition hover:text-brand-600">
+            <Hash className="size-3.5" />{task.id}
+            <Copy className="size-3 opacity-0 transition group-hover:opacity-100" />
+          </button>
+          {showOpenLink && (
+            <Link to={`/tasks/${task.id}`}
+              className="flex items-center gap-1 text-[12px] font-medium text-slate-400 hover:text-brand-600">
+              <ExternalLink className="size-3.5" /> На отдельной странице
+            </Link>
+          )}
+        </div>
+        <h3 className="text-lg leading-snug font-bold">{task.title}</h3>
+        {task.description && (
+          <p className="mt-3 text-[13.5px] leading-relaxed text-slate-600">{task.description}</p>
         )}
-      </div>
-      <h3 className="text-lg leading-snug font-bold">{task.title}</h3>
-      {task.description && (
-        <p className="mt-3 text-[13.5px] leading-relaxed text-slate-600">{task.description}</p>
-      )}
-      <dl className="mt-5 grid grid-cols-[130px_1fr] gap-x-4 gap-y-2.5 border-t border-slate-100 pt-4 text-[13.5px]">
-        <dt className="text-slate-400">Клиент</dt>
-        <dd className={task.client && task.client !== "—" ? "font-medium text-brand-600" : "text-slate-400 italic"}>
-          {task.client && task.client !== "—" ? task.client : "Без компании"}
-        </dd>
-        <dt className="text-slate-400">Исполнитель</dt>
-        <dd className="flex items-center gap-2"><Avatar name={task.assignee} className="!size-6 !text-[10px]" />{task.assignee}</dd>
-        <dt className="text-slate-400">Постановщик</dt>
-        <dd>{task.source === "crm" ? "Создана в CRM" : task.fromBot ? "Автораспределение (Telegram)" : "Ибрагимова Юлдуз"}</dd>
-        <dt className="text-slate-400">Создана</dt>
-        <dd>{task.created ?? "—"}</dd>
-        <dt className="text-slate-400">Дедлайн</dt>
-        <dd className={`font-semibold ${isOverdue(task) ? "text-red-600" : ""}`}>{task.due}</dd>
-      </dl>
-      {!!task.attachments?.length && (
-        <div className="mt-4 border-t border-slate-100 pt-4">
-          <div className="mb-1.5 text-[11px] font-semibold tracking-wider text-slate-400 uppercase">Вложения</div>
-          <div className="flex flex-wrap gap-2">
-            {task.attachments.map((a) => (
-              <button
-                key={a.index}
-                type="button"
-                onClick={() => openTaskFile(task.id, a.index).catch(() => toast("Не удалось открыть файл"))}
-                className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[13px] font-medium text-slate-600 hover:border-brand-400 hover:text-brand-600"
-              >
-                <Paperclip className="size-3.5" /> Вложение {a.index + 1}
-              </button>
-            ))}
+        {!!task.attachments?.length && (
+          <div className="mt-4">
+            <div className="mb-1.5 text-[11px] font-semibold tracking-wider text-slate-400 uppercase">Вложения</div>
+            <div className="flex flex-wrap gap-2">
+              {task.attachments.map((a) => (
+                <button
+                  key={a.index}
+                  type="button"
+                  onClick={() => openTaskFile(task.id, a.index).catch(() => toast("Не удалось открыть файл"))}
+                  className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[13px] font-medium text-slate-600 hover:border-brand-400 hover:text-brand-600"
+                >
+                  <Paperclip className="size-3.5" /> Вложение {a.index + 1}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="mt-5 border-t border-slate-100 pt-1">
+          <div className="flex items-center gap-1 border-b border-slate-200">
+            <button type="button" onClick={() => setTab("chat")}
+              className={`border-b-2 px-3 py-2 text-[13px] font-medium transition ${
+                tab === "chat" ? "border-brand-600 text-brand-600" : "border-transparent text-slate-400 hover:text-slate-600"}`}>
+              Комментарии{thread.length ? ` · ${thread.length}` : ""}
+            </button>
+            <button type="button" onClick={() => setTab("history")}
+              className={`border-b-2 px-3 py-2 text-[13px] font-medium transition ${
+                tab === "history" ? "border-brand-600 text-brand-600" : "border-transparent text-slate-400 hover:text-slate-600"}`}>
+              История
+            </button>
+          </div>
+          <div className="pt-3">
+            {tab === "chat" ? <TaskChat task={task} /> : <TaskHistory taskId={task.id} />}
           </div>
         </div>
-      )}
-      <TaskChat task={task} />
-      <div className="mt-4 border-t border-slate-100 pt-4">
-        <div className="mb-1.5 text-[11px] font-semibold tracking-wider text-slate-400 uppercase">История</div>
-        <TaskHistory taskId={task.id} />
       </div>
-    </>
+
+      <aside className="space-y-4 rounded-lg border border-slate-100 bg-slate-50/60 p-3.5 md:sticky md:top-0">
+        <InfoField label="Статус"><Badge tone={statusTone[displayStatus(task)]}>{displayStatus(task)}</Badge></InfoField>
+        <InfoField label="Приоритет"><Badge tone={priorityTone[task.priority]}>{task.priority}</Badge></InfoField>
+        {task.type === "reminder" && <InfoField label="Тип"><Badge tone="purple">напоминание</Badge></InfoField>}
+        <InfoField label="Клиент">
+          <span className={task.client && task.client !== "—" ? "font-medium text-brand-600" : "text-slate-400 italic"}>
+            {task.client && task.client !== "—" ? task.client : "Без компании"}
+          </span>
+        </InfoField>
+        <InfoField label="Исполнитель">
+          <span className="flex items-center gap-2"><Avatar name={task.assignee} className="!size-6 !text-[10px]" />{task.assignee}</span>
+        </InfoField>
+        {src && <InfoField label="Источник"><Badge tone="cyan">{src}</Badge></InfoField>}
+        <InfoField label="Постановщик">{task.source === "crm" ? "Создана в CRM" : task.fromBot ? "Автораспределение (Telegram)" : "Ибрагимова Юлдуз"}</InfoField>
+        <InfoField label="Создана">{task.created ?? "—"}</InfoField>
+        <InfoField label="Дедлайн">
+          <span className={isOverdue(task) ? "font-semibold text-red-600" : ""}>
+            {task.due}{isOverdue(task) ? " · просрочена" : ""}
+          </span>
+        </InfoField>
+      </aside>
+    </div>
   );
 }
 
@@ -427,7 +474,7 @@ function TaskViewModal({
 }: { task: Task | null; onClose: () => void; onEdit: (t: Task) => void; onDelete: (t: Task) => void }) {
   if (!task) return null;
   return (
-    <Modal open onClose={onClose} title={`Задача № ${task.id}`} wide
+    <Modal open onClose={onClose} title={`Задача № ${task.id}`} size="xl"
       footer={
         <TaskDetailActions
           task={task}
