@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Bot, FileText, MessageSquareText, RefreshCw, Sparkles, Tags, Wand2 } from "lucide-react";
-import { Badge, Card, CardHeader, toast } from "../components/ui";
+import { Badge, Card, CardHeader, Toggle, toast } from "../components/ui";
 import { aiClassify, fetchAiPing, fetchAiSettings, saveAiSettings, type AiSettings } from "../api";
 
 const FEATURES: { key: keyof AiSettings; icon: typeof Tags; title: string; desc: string }[] = [
@@ -98,10 +98,7 @@ export default function IntegrationAI() {
                 <div className="text-[13.5px] font-semibold">{f.title}</div>
                 <div className="mt-0.5 text-[12.5px] leading-relaxed text-slate-500">{f.desc}</div>
               </div>
-              <button onClick={() => toggle(f.key)}
-                className={`relative h-[22px] w-[38px] shrink-0 rounded-full transition-colors ${settings?.[f.key] ? "bg-brand-600" : "bg-slate-300"}`}>
-                <span className={`absolute top-[3px] size-4 rounded-full bg-white shadow transition-transform ${settings?.[f.key] ? "translate-x-[19px]" : "translate-x-[3px]"}`} />
-              </button>
+              <Toggle checked={!!settings?.[f.key]} onChange={() => toggle(f.key)} />
             </div>
           ))}
         </div>

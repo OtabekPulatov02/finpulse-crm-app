@@ -110,11 +110,14 @@ export function Toaster() {
 }
 
 /* ---------- Toggle ---------- */
-export function Toggle({ defaultChecked = true }: { defaultChecked?: boolean }) {
-  const [on, setOn] = useState(defaultChecked);
+export function Toggle({ defaultChecked = true, checked, onChange }: {
+  defaultChecked?: boolean; checked?: boolean; onChange?: (v: boolean) => void;
+}) {
+  const [inner, setInner] = useState(defaultChecked);
+  const on = checked ?? inner;
   return (
     <button
-      onClick={() => setOn(!on)}
+      onClick={() => { setInner(!on); onChange?.(!on); }}
       className={`relative h-[22px] w-[38px] shrink-0 rounded-full transition-colors ${on ? "bg-brand-600" : "bg-slate-300"}`}
     >
       <span className={`absolute top-[3px] size-4 rounded-full bg-white shadow transition-[left] ${on ? "left-[19px]" : "left-[3px]"}`} />
