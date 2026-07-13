@@ -133,12 +133,13 @@ const DEFAULT_BOT_CATS: BotCategory[] = [
 function BotTab() {
   const [set, setSet] = useState<BotSettings | null>(null);
   const [cats, setCats] = useState<BotCategory[] | null>(null);
-  const [positions, setPositions] = useState<string>("");
+  const [positions, setPositions] = useState<string[]>([]);
+  const [newPos, setNewPos] = useState("");
   const [saving, setSaving] = useState(false);
   useEffect(() => {
     fetchBotSettings().then(setSet).catch(() => setSet({ slaHours: 3, workStart: 9, workEnd: 16, tzOffset: 5 }));
     fetchBotCategories().then((c) => setCats(c ?? DEFAULT_BOT_CATS)).catch(() => setCats(DEFAULT_BOT_CATS));
-    fetchBotPositions().then((p2) => setPositions(p2.join(", "))).catch(() => {});
+    fetchBotPositions().then(setPositions).catch(() => {});
   }, []);
   if (!set || !cats) return <Card><div className="p-8 text-center text-sm text-slate-400">Загрузка настроек бота…</div></Card>;
 
@@ -147,7 +148,7 @@ function BotTab() {
     try {
       const r1 = await saveBotSettings(set);
       const r2 = await saveBotCategories(cats);
-      const r3 = await saveBotPositions(positions.split(",").map((v) => v.trim()).filter(Boolean));
+      const r3 = await saveBotPositions(positions);
       if (r1.ok && r2.ok && r3.ok) toast("Настройки бота сохранены — применяются сразу");
       else toast(r1.error || r2.error || r3.error || "Не удалось сохранить");
     } finally { setSaving(false); }
@@ -175,9 +176,30 @@ function BotTab() {
           </div>
           <div>
             <div className="mb-1.5 font-medium">Должности (табы при регистрации)</div>
-            <input value={positions} onChange={(e) => setPositions(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-[13px] focus:border-brand-500 focus:outline-none" />
-            <p className="mt-1.5 text-xs text-slate-400">Через запятую. «Другое» добавляется автоматически. Тот же список — в карточке клиента.</p>
+            <div className="flex flex-wrap gap-1.5">
+              {positions.map((p2, i) => (
+                <span key={i} className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 py-1 pr-1.5 pl-2.5 text-[12.5px] font-medium">
+                  {p2}
+                  <button onClick={() => setPositions(positions.filter((_, xi) => xi !== i))}
+                    className="rounded-full p-0.5 text-slate-400 hover:bg-red-50 hover:text-red-600" aria-label="Удалить">
+                    <svg className="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6 6 18M6 6l12 12" /></svg>
+                  </button>
+                </span>
+              ))}
+              <span className="inline-flex items-center gap-1 rounded-full border border-dashed border-slate-300 py-1 pr-1.5 pl-2.5 text-[12.5px] text-slate-400">Другое — всегда</span>
+            </div>
+            <div className="mt-2 flex gap-1.5">
+              <input value={newPos} onChange={(e) => setNewPos(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter" && newPos.trim()) { setPositions([...positions, newPos.trim()]); setNewPos(""); } }}
+                placeholder="Новая должность"
+                className="w-44 rounded-lg border border-slate-200 px-2.5 py-1.5 text-[13px] focus:border-brand-500 focus:outline-none" />
+              <button onClick={() => { if (newPos.trim()) { setPositions([...positions, newPos.trim()]); setNewPos(""); } }}
+                disabled={!newPos.trim()}
+                className="flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-[13px] font-medium hover:bg-slate-50 disabled:opacity-40">
+                <Plus className="size-3.5" /> Добавить
+              </button>
+            </div>
+            <p className="mt-1.5 text-xs text-slate-400">Тот же список — в карточке клиента.</p>
           </div>
           <div>
             <div className="mb-1.5 font-medium">Доверенные лица</div>
