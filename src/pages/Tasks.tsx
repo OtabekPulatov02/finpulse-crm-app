@@ -15,7 +15,8 @@ import {
 import { createTask, deleteTaskEverywhere, displayStatus, editTask, isOverdue, sendMessage, setTaskStatus, useTasks } from "../store/tasks";
 import { hydrateClients, useClients } from "../store/clients";
 import { hydrateEmployees, useEmployees } from "../store/employees";
-import { attachTaskFileRequest, fetchLogs, fmtTs, openTaskFile } from "../api";
+import { attachTaskFileRequest, fetchLogs, fmtTs } from "../api";
+import { previewFile } from "../components/FilePreview";
 import { mapLog, type LogView } from "../lib/logs";
 import { formatSumsInText } from "../lib/amount";
 
@@ -157,7 +158,7 @@ export function TaskFormModal({
                 <button
                   key={a.index}
                   type="button"
-                  onClick={() => openTaskFile(task.id, a.index).catch(() => toast("Не удалось открыть файл"))}
+                  onClick={() => previewFile(task.id, a.index, `Вложение к задаче №${task.id}`)}
                   className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[13px] font-medium text-slate-600 hover:border-brand-400 hover:text-brand-600"
                 >
                   <Paperclip className="size-3.5" /> Вложение {a.index + 1}
@@ -273,7 +274,7 @@ function TaskChat({ task }: { task: Task }) {
               {m.text && <div className="whitespace-pre-wrap">{m.text}</div>}
               {m.fileIndex != null && (
                 <button type="button"
-                  onClick={() => openTaskFile(task.id, m.fileIndex as number).catch(() => toast("Не удалось открыть файл"))}
+                  onClick={() => previewFile(task.id, m.fileIndex as number, `Вложение к задаче №${task.id}`)}
                   className={`mt-1.5 flex items-center gap-1.5 rounded-md px-2 py-1 text-[12px] font-medium ${
                     m.from === "staff" ? "bg-white/15 hover:bg-white/25" : "bg-slate-100 hover:bg-slate-200"}`}>
                   <Paperclip className="size-3.5" /> Вложение
@@ -372,7 +373,7 @@ export function TaskDetailBody({ task, showOpenLink }: { task: Task; showOpenLin
                 <button
                   key={a.index}
                   type="button"
-                  onClick={() => openTaskFile(task.id, a.index).catch(() => toast("Не удалось открыть файл"))}
+                  onClick={() => previewFile(task.id, a.index, `Вложение к задаче №${task.id}`)}
                   className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[13px] font-medium text-slate-600 hover:border-brand-400 hover:text-brand-600"
                 >
                   <Paperclip className="size-3.5" /> Вложение {a.index + 1}

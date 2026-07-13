@@ -210,16 +210,23 @@ export const sendTaskMessageRequest = async (num: number, text: string, file?: F
    передать через обычную ссылку/img, поэтому скачиваем как Blob через
    fetch с authHeaders(), затем открываем через object URL. */
 export async function openTaskFile(num: number, index: number): Promise<void> {
+  const blob = await fetchTaskFileBlob(num, index);
+  const url = URL.createObjectURL(blob);
+  window.open(url, "_blank");
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
+/* Загружает вложение как Blob (без открытия вкладки) — используется
+   предпросмотром внутри CRM (FilePreviewer), который сам решает, как
+   показать файл (картинка/pdf/видео/скачивание). */
+export async function fetchTaskFileBlob(num: number, index: number): Promise<Blob> {
   const r = await fetch(`${API}?r=task_file&num=${num}&i=${index}`, {
     headers: authHeaders(),
     signal: AbortSignal.timeout(20000),
   });
-  if (r.status === 401) { clearSession(); return; }
+  if (r.status === 401) { clearSession(); throw new Error("unauthorized"); }
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
-  const blob = await r.blob();
-  const url = URL.createObjectURL(blob);
-  window.open(url, "_blank");
-  setTimeout(() => URL.revokeObjectURL(url), 60000);
+  return r.blob();
 }
 
 export const fetchCalendar = () =>

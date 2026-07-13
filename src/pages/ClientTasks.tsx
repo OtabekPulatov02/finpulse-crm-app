@@ -2,9 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { Hash, Kanban, LayoutList, Paperclip, Pencil, Plus, X } from "lucide-react";
 import { Field, Input, Modal, Textarea, toast } from "../components/ui";
 import {
-  attachTaskFileRequest, createTaskRequest, fetchBotTasks, fmtTs, openTaskFile,
+  attachTaskFileRequest, createTaskRequest, fetchBotTasks, fmtTs,
   updateTaskRequest, type BotTask,
 } from "../api";
+import { previewFile } from "../components/FilePreview";
 import { formatSumsInText } from "../lib/amount";
 
 const STATUS_LABEL: Record<BotTask["status"], string> = {
@@ -130,7 +131,7 @@ function TaskFormModal({
                 <button
                   key={a.index}
                   type="button"
-                  onClick={() => openTaskFile(task.num, a.index).catch(() => {})}
+                  onClick={() => previewFile(task.num, a.index, `Вложение к задаче №${task.num}`)}
                   className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[13px] font-medium text-slate-600 hover:border-brand-400 hover:text-brand-600"
                 >
                   <Paperclip className="size-3.5" /> Вложение {a.index + 1}
