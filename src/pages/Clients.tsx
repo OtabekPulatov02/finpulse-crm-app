@@ -9,7 +9,7 @@ import {
 } from "../components/ui";
 import { useEmployees, hydrateEmployees } from "../store/employees";
 import type { AccessRequest, CrmClient } from "../api";
-import { fetchAccessRequests, resolveAccessRequest, addOpsPack, fetchTariffs, fetchUsage, type ClientUsage, type Tariff } from "../api";
+import { fetchAccessRequests, resolveAccessRequest, addOpsPack, fetchBotPositions, fetchTariffs, fetchUsage, type ClientUsage, type Tariff } from "../api";
 import { createClient, hydrateClients, patchClient, removeClient, useClients } from "../store/clients";
 import { formatPhone } from "../lib/phone";
 import { formatSumsInText } from "../lib/amount";
@@ -25,6 +25,12 @@ const STATUSES = ["active", "pending", "archived"];
 function ClientFormModal({
   open, onClose, client, tariffNames,
 }: { open: boolean; onClose: () => void; client?: CrmClient | null; tariffNames: string[] }) {
+  const [positionOptions, setPositionOptions] = useState<string[]>([]);
+  useEffect(() => {
+    fetchBotPositions()
+      .then((p2) => setPositionOptions(p2.map((x) => x.replace(/^[^\wа-яА-ЯёЁ]+\s*/, ""))))
+      .catch(() => {});
+  }, []);
   const employees = useEmployees();
   useEffect(() => { void hydrateEmployees(); }, []);
   const employeeNames = employees.filter((e) => e.active).map((e) => e.name);
@@ -90,7 +96,14 @@ function ClientFormModal({
         {edit && <p className="-mt-2 text-xs text-slate-400">Название и телефон компании нельзя изменить из карточки — они привязаны к регистрации в Telegram.</p>}
         <div className="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
           <Field label="Телефон"><Input type="tel" placeholder="+998 90 000-00-00" value={phone} onChange={(e) => setPhone(e.target.value)} disabled={edit} /></Field>
-          <Field label="Должность контакта"><Input placeholder="Главный бухгалтер" value={position} onChange={(e) => setPosition(e.target.value)} /></Field>
+          <Field label="Должность контакта">
+            <Select value={positionOptions.includes(position) ? position : position ? "__custom" : ""}
+              onChange={(e) => { if (e.target.value !== "__custom") setPosition(e.target.value); }}>
+              <option value="">—</option>
+              {positionOptions.map((p2) => <option key={p2} value={p2}>{p2}</option>)}
+              {position && !positionOptions.includes(position) && <option value="__custom">{position} (своя)</option>}
+            </Select>
+          </Field>
         </div>
         <div className="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
           <Field label="Тариф">

@@ -466,3 +466,9 @@ export const aiClassify = (text: string) =>
 
 export const aiDraft = (num: number) =>
   aiPost<{ ok: boolean; draft?: Record<string, unknown>; error?: string }>({ action: "draft", num });
+
+export const fetchBotPositions = () =>
+  get<{ ok: boolean; positions: string[] }>("r=bot_positions").then((d) => d.positions ?? []);
+
+export const saveBotPositions = (positions: string[]) =>
+  post<{ ok: boolean; error?: string }>({ action: "bot_positions_save", positions });

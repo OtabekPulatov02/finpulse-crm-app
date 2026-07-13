@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { BookOpen, Bell, Bot as BotIcon, CreditCard, GitBranch, Pencil, Plus, ScrollText, Shield, Tags, Trash2, UserPlus, Users } from "lucide-react";
 import { Avatar, Badge, Card, CardHeader, Toggle, toast, type Tone } from "../components/ui";
-import { fetchBotCategories, fetchBotSettings, fetchLogs, fetchTariffs, saveBotCategories, saveBotSettings, saveTariffs, type BotCategory, type BotSettings, type Tariff } from "../api";
+import { fetchBotCategories, fetchBotPositions, fetchBotSettings, fetchLogs, fetchTariffs, saveBotCategories, saveBotPositions, saveBotSettings, saveTariffs, type BotCategory, type BotSettings, type Tariff } from "../api";
 import { mapLog, type LogView } from "../lib/logs";
 import { hydrateEmployees, useEmployees } from "../store/employees";
 import { EDITABLE_STATUSES, PRIORITIES, priorityTone, statusTone } from "../data/demo";
@@ -133,10 +133,12 @@ const DEFAULT_BOT_CATS: BotCategory[] = [
 function BotTab() {
   const [set, setSet] = useState<BotSettings | null>(null);
   const [cats, setCats] = useState<BotCategory[] | null>(null);
+  const [positions, setPositions] = useState<string>("");
   const [saving, setSaving] = useState(false);
   useEffect(() => {
     fetchBotSettings().then(setSet).catch(() => setSet({ slaHours: 3, workStart: 9, workEnd: 16, tzOffset: 5 }));
     fetchBotCategories().then((c) => setCats(c ?? DEFAULT_BOT_CATS)).catch(() => setCats(DEFAULT_BOT_CATS));
+    fetchBotPositions().then((p2) => setPositions(p2.join(", "))).catch(() => {});
   }, []);
   if (!set || !cats) return <Card><div className="p-8 text-center text-sm text-slate-400">Загрузка настроек бота…</div></Card>;
 
@@ -145,8 +147,9 @@ function BotTab() {
     try {
       const r1 = await saveBotSettings(set);
       const r2 = await saveBotCategories(cats);
-      if (r1.ok && r2.ok) toast("Настройки бота сохранены — применяются сразу");
-      else toast(r1.error || r2.error || "Не удалось сохранить");
+      const r3 = await saveBotPositions(positions.split(",").map((v) => v.trim()).filter(Boolean));
+      if (r1.ok && r2.ok && r3.ok) toast("Настройки бота сохранены — применяются сразу");
+      else toast(r1.error || r2.error || r3.error || "Не удалось сохранить");
     } finally { setSaving(false); }
   };
   const numInput = "w-20 rounded-lg border border-slate-200 px-2.5 py-1.5 text-center focus:border-brand-500 focus:outline-none";
@@ -169,6 +172,12 @@ function BotTab() {
             <div className="mb-1.5 font-medium">SLA, часов</div>
             <input className={numInput} value={set.slaHours} onChange={(e) => setSet({ ...set, slaHours: Number(e.target.value.replace(/\D/g, "")) || 1 })} />
             <p className="mt-1.5 text-xs text-slate-400">«⏱ Проведём вашу операцию в течение N ч.» после приёма заявки</p>
+          </div>
+          <div>
+            <div className="mb-1.5 font-medium">Должности (табы при регистрации)</div>
+            <input value={positions} onChange={(e) => setPositions(e.target.value)}
+              className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-[13px] focus:border-brand-500 focus:outline-none" />
+            <p className="mt-1.5 text-xs text-slate-400">Через запятую. «Другое» добавляется автоматически. Тот же список — в карточке клиента.</p>
           </div>
           <div>
             <div className="mb-1.5 font-medium">Доверенные лица</div>
