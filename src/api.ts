@@ -196,10 +196,15 @@ export const attachTaskFileRequest = async (num: number, file: File) => {
   });
 };
 
-/* Отправка сообщения в чат задачи — доставляется в Telegram (сотруднику
-   клиенту в личку, клиенту в группу бухгалтеров) и сохраняется в ленту. */
-export const sendTaskMessageRequest = (num: number, text: string) =>
-  post<TaskResult>({ action: "task_message_send", num, text });
+/* Отправка сообщения в ленту задачи — чисто внутренняя история (как в
+   YouTrack), никуда за пределы CRM не уходит. Можно приложить файл —
+   он загружается вместе с сообщением одним запросом. */
+export const sendTaskMessageRequest = async (num: number, text: string, file?: File | null) => {
+  const fileFields = file
+    ? { filename: file.name, mimeType: file.type, dataBase64: await fileToBase64(file) }
+    : {};
+  return post<TaskResult>({ action: "task_message_send", num, text, ...fileFields });
+};
 
 /* Открывает вложение задачи в новой вкладке: заголовки авторизации нельзя
    передать через обычную ссылку/img, поэтому скачиваем как Blob через

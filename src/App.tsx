@@ -6,6 +6,7 @@ import ClientTasks from "./pages/ClientTasks";
 import ClientProfile from "./pages/ClientProfile";
 import Dashboard from "./pages/Dashboard";
 import Tasks from "./pages/Tasks";
+import TaskDetailPage from "./pages/TaskDetailPage";
 import Clients from "./pages/Clients";
 import Calendar from "./pages/Calendar";
 import Employees from "./pages/Employees";
@@ -29,6 +30,7 @@ export default function App() {
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/tasks" element={<Tasks />} />
+            <Route path="/tasks/:id" element={<TaskDetailPage />} />
             <Route path="/calendar" element={<Calendar />} />
             <Route path="/clients" element={<Clients />} />
             <Route path="/employees" element={<Employees />} />

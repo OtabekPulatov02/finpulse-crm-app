@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { Hash, Kanban, LayoutList, Paperclip, Pencil, Plus, Send, X } from "lucide-react";
+import { Hash, Kanban, LayoutList, Paperclip, Pencil, Plus, X } from "lucide-react";
 import { Field, Input, Modal, Textarea, toast } from "../components/ui";
 import {
   attachTaskFileRequest, createTaskRequest, fetchBotTasks, fmtTs, openTaskFile,
-  sendTaskMessageRequest, updateTaskRequest, type BotTask,
+  updateTaskRequest, type BotTask,
 } from "../api";
 import { formatSumsInText } from "../lib/amount";
 
@@ -29,71 +29,6 @@ function StatusBadge({ status }: { status: BotTask["status"] }) {
       <span className="size-1.5 rounded-full bg-current" />
       {STATUS_LABEL[status]}
     </span>
-  );
-}
-
-/* Чат по задаче — та же лента, что видна бухгалтерии в CRM. Сообщение,
-   отправленное клиентом отсюда, уходит в группу бухгалтеров в Telegram
-   (реплаем на карточку задачи), а всё, что бухгалтер пишет в Telegram,
-   появляется здесь при следующем обновлении. */
-function ClientTaskChat({ task, onSaved }: { task: BotTask; onSaved: (t: BotTask) => void }) {
-  const [text, setText] = useState("");
-  const [sending, setSending] = useState(false);
-  const thread = task.thread ?? [];
-  const bottomRef = useRef<HTMLDivElement>(null);
-  useEffect(() => { bottomRef.current?.scrollIntoView({ block: "end" }); }, [thread.length]);
-
-  async function send() {
-    const t = text.trim();
-    if (!t || sending) return;
-    setSending(true);
-    try {
-      const r = await sendTaskMessageRequest(task.num, t);
-      if (r.ok && r.task) { onSaved(r.task); setText(""); }
-      else toast(r.error || "Не удалось отправить сообщение");
-    } finally {
-      setSending(false);
-    }
-  }
-
-  return (
-    <div className="mt-1">
-      <div className="max-h-64 space-y-3 overflow-y-auto rounded-lg border border-slate-100 bg-slate-50/60 p-3">
-        {!thread.length && (
-          <p className="py-4 text-center text-xs text-slate-400">Сообщений пока нет — напишите, и бухгалтер увидит его в Telegram.</p>
-        )}
-        {thread.map((m) => (
-          <div key={m.id} className={`flex ${m.from === "client" ? "justify-end" : "justify-start"}`}>
-            <div className={`max-w-[80%] rounded-xl px-3 py-2 text-[13px] leading-snug ${
-              m.from === "client" ? "bg-brand-600 text-white" : "border border-slate-200 bg-white text-slate-700"}`}>
-              <div className={`mb-0.5 text-[11px] font-semibold ${m.from === "client" ? "text-brand-100" : "text-slate-400"}`}>
-                {m.from === "client" ? "Вы" : m.by}
-              </div>
-              {m.text && <div className="whitespace-pre-wrap">{m.text}</div>}
-              {m.fileIndex != null && (
-                <button type="button"
-                  onClick={() => openTaskFile(task.num, m.fileIndex as number).catch(() => toast("Не удалось открыть файл"))}
-                  className={`mt-1.5 flex items-center gap-1.5 rounded-md px-2 py-1 text-[12px] font-medium ${
-                    m.from === "client" ? "bg-white/15 hover:bg-white/25" : "bg-slate-100 hover:bg-slate-200"}`}>
-                  <Paperclip className="size-3.5" /> Вложение
-                </button>
-              )}
-              <div className={`mt-1 text-right text-[10px] ${m.from === "client" ? "text-brand-100/80" : "text-slate-400"}`}>{fmtTs(m.at)}</div>
-            </div>
-          </div>
-        ))}
-        <div ref={bottomRef} />
-      </div>
-      <div className="mt-2 flex items-end gap-2">
-        <Textarea value={text} onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(); } }}
-          placeholder="Написать бухгалтеру…" rows={2} className="flex-1" />
-        <button type="button" disabled={sending || !text.trim()} onClick={send}
-          className="flex h-full items-center gap-1.5 self-stretch rounded-lg bg-brand-600 px-3.5 text-[13px] font-medium text-white hover:bg-brand-700 disabled:opacity-50">
-          <Send className="size-4" />
-        </button>
-      </div>
-    </div>
   );
 }
 
@@ -204,11 +139,6 @@ function TaskFormModal({
             </div>
           )}
         </Field>
-        {edit && task && (
-          <Field label="Чат по задаче">
-            <ClientTaskChat task={task} onSaved={onSaved} />
-          </Field>
-        )}
       </div>
     </Modal>
   );

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   Archive, Calendar, Check, ExternalLink, Hash, Kanban, LayoutList, MoreHorizontal,
   Paperclip, Pencil, Plus, RotateCcw, Search, Send, Trash2, X,
@@ -45,7 +45,7 @@ function sourceLabel(t: Task) {
 
 /* ---------------- Форма задачи (создание/изменение) ---------------- */
 
-function TaskFormModal({
+export function TaskFormModal({
   open, onClose, task, defaultStatus,
 }: { open: boolean; onClose: () => void; task?: Task | null; defaultStatus?: TaskStatus }) {
   const clients = useClients();
@@ -236,18 +236,20 @@ function TaskHistory({ taskId }: { taskId: number }) {
 
 function TaskChat({ task }: { task: Task }) {
   const [text, setText] = useState("");
+  const [file, setFile] = useState<File | null>(null);
   const [sending, setSending] = useState(false);
   const thread = task.thread ?? [];
   const bottomRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => { bottomRef.current?.scrollIntoView({ block: "end" }); }, [thread.length]);
 
   const send = async () => {
     const t = text.trim();
-    if (!t || sending) return;
+    if ((!t && !file) || sending) return;
     setSending(true);
     try {
-      const r = await sendMessage(task.id, t);
-      if (r.ok) setText("");
+      const r = await sendMessage(task.id, t, file);
+      if (r.ok) { setText(""); setFile(null); }
       else toast(r.error || "Не удалось отправить сообщение");
     } finally {
       setSending(false);
@@ -256,11 +258,11 @@ function TaskChat({ task }: { task: Task }) {
 
   return (
     <div className="mt-4 border-t border-slate-100 pt-4">
-      <div className="mb-2 text-[11px] font-semibold tracking-wider text-slate-400 uppercase">Чат по задаче</div>
+      <div className="mb-2 text-[11px] font-semibold tracking-wider text-slate-400 uppercase">Лента задачи</div>
       <div className="max-h-72 space-y-3 overflow-y-auto rounded-lg border border-slate-100 bg-slate-50/60 p-3">
         {!thread.length && (
           <p className="py-4 text-center text-xs text-slate-400">
-            Сообщений пока нет — напишите первым, оно уйдёт клиенту в Telegram.
+            Здесь пока пусто — оставьте комментарий, вложение или заметку по задаче.
           </p>
         )}
         {thread.map((m) => (
@@ -283,12 +285,28 @@ function TaskChat({ task }: { task: Task }) {
         ))}
         <div ref={bottomRef} />
       </div>
-      <div className="mt-2 flex items-end gap-2">
+      {file && (
+        <div className="mt-2 flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-[12.5px]">
+          <span className="flex min-w-0 items-center gap-1.5 text-slate-600">
+            <Paperclip className="size-3.5 shrink-0 text-slate-400" />
+            <span className="truncate">{file.name}</span>
+          </span>
+          <button type="button" onClick={() => setFile(null)} className="shrink-0 rounded p-0.5 text-slate-400 hover:text-slate-700">
+            <X className="size-3.5" />
+          </button>
+        </div>
+      )}
+      <div className="mt-2 flex items-center gap-2">
+        <input ref={fileInputRef} type="file" className="hidden" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+        <button type="button" onClick={() => fileInputRef.current?.click()} title="Прикрепить файл"
+          className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:border-brand-300 hover:text-brand-600">
+          <Paperclip className="size-4" />
+        </button>
         <Textarea value={text} onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(); } }}
-          placeholder="Написать сообщение — уйдёт в Telegram" rows={2} className="flex-1" />
-        <button type="button" disabled={sending || !text.trim()} onClick={send}
-          className="flex h-full items-center gap-1.5 self-stretch rounded-lg bg-brand-600 px-3.5 text-[13px] font-medium text-white hover:bg-brand-700 disabled:opacity-50">
+          placeholder="Комментарий по задаче…" rows={1} className="!min-h-9 flex-1 resize-none !py-2" />
+        <button type="button" disabled={sending || (!text.trim() && !file)} onClick={send} title="Отправить"
+          className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-brand-600 text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-40">
           <Send className="size-4" />
         </button>
       </div>
@@ -296,54 +314,26 @@ function TaskChat({ task }: { task: Task }) {
   );
 }
 
-function TaskViewModal({
-  task, onClose, onEdit, onDelete,
-}: { task: Task | null; onClose: () => void; onEdit: (t: Task) => void; onDelete: (t: Task) => void }) {
-  if (!task) return null;
+/* Общее тело карточки задачи — используется и в модалке быстрого
+   просмотра, и на отдельной странице (/tasks/:id), чтобы не дублировать
+   разметку. showOpenLink добавляет ссылку "открыть на отдельной странице"
+   (её незачем показывать, когда мы уже на этой странице). */
+export function TaskDetailBody({ task, showOpenLink }: { task: Task; showOpenLink?: boolean }) {
   const src = sourceLabel(task);
-  const isCancelled = task.status === "Отменено";
-  const isDone = task.status === "Выполнена";
   return (
-    <Modal open onClose={onClose} title={`Задача № ${task.id}`} wide
-      footer={
-        <>
-          {!isDone && !isCancelled && (
-            <button
-              onClick={() => { setTaskStatus(task.id, "Выполнена"); toast("Статус обновлён — задача выполнена"); onClose(); }}
-              className="mr-auto flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-[13px] font-medium text-white hover:bg-emerald-700">
-              <Check className="size-4" /> Выполнена
-            </button>
-          )}
-          {!isCancelled && !isDone && (
-            <button
-              onClick={() => { setTaskStatus(task.id, "Отменено"); toast("Задача отменена"); onClose(); }}
-              className={`flex items-center gap-1.5 rounded-lg border border-red-200 px-3.5 py-2 text-[13px] font-medium text-red-600 hover:bg-red-50 ${isDone ? "" : "mr-auto"}`}>
-              <X className="size-4" /> Отменить
-            </button>
-          )}
-          {isCancelled && (
-            <button
-              onClick={() => { setTaskStatus(task.id, "Новая"); toast("Задача возобновлена"); onClose(); }}
-              className="mr-auto flex items-center gap-1.5 rounded-lg border border-slate-200 px-3.5 py-2 text-[13px] font-medium text-slate-600 hover:bg-slate-50">
-              <RotateCcw className="size-4" /> Возобновить
-            </button>
-          )}
-          <button onClick={() => { onClose(); onDelete(task); }}
-            className="flex items-center gap-1.5 rounded-lg border border-red-200 px-3.5 py-2 text-[13px] font-medium text-red-600 hover:bg-red-50">
-            <Trash2 className="size-4" /> Удалить
-          </button>
-          <button onClick={() => { onClose(); onEdit(task); }}
-            className="flex items-center gap-1.5 rounded-lg bg-brand-600 px-4 py-2 text-[13px] font-medium text-white hover:bg-brand-700">
-            <Pencil className="size-4" /> Изменить
-          </button>
-        </>
-      }>
-      <div className="mb-3 flex flex-wrap gap-2">
+    <>
+      <div className="mb-3 flex flex-wrap items-center gap-2">
         <Badge tone={statusTone[displayStatus(task)]}>{displayStatus(task)}</Badge>
         <Badge tone={priorityTone[task.priority]}>{task.priority} приоритет</Badge>
         {src && <Badge tone="cyan">{src}</Badge>}
         {task.type === "reminder" && <Badge tone="purple">напоминание</Badge>}
         {isOverdue(task) && <Badge tone="red">просрочена</Badge>}
+        {showOpenLink && (
+          <Link to={`/tasks/${task.id}`}
+            className="ml-auto flex items-center gap-1 text-[12px] font-medium text-slate-400 hover:text-brand-600">
+            <ExternalLink className="size-3.5" /> На отдельной странице
+          </Link>
+        )}
       </div>
       <h3 className="text-lg leading-snug font-bold">{task.title}</h3>
       {task.description && (
@@ -385,6 +375,68 @@ function TaskViewModal({
         <div className="mb-1.5 text-[11px] font-semibold tracking-wider text-slate-400 uppercase">История</div>
         <TaskHistory taskId={task.id} />
       </div>
+    </>
+  );
+}
+
+/* Кнопки действий над задачей — тоже общие для модалки и отдельной
+   страницы. onDone — вызывается после смены статуса (модалка закрывает
+   себя, страница просто остаётся на месте). */
+export function TaskDetailActions({
+  task, onEdit, onDelete, afterAction,
+}: { task: Task; onEdit: (t: Task) => void; onDelete: (t: Task) => void; afterAction?: () => void }) {
+  const isCancelled = task.status === "Отменено";
+  const isDone = task.status === "Выполнена";
+  return (
+    <>
+      {!isDone && !isCancelled && (
+        <button
+          onClick={() => { setTaskStatus(task.id, "Выполнена"); toast("Статус обновлён — задача выполнена"); afterAction?.(); }}
+          className="mr-auto flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-[13px] font-medium text-white hover:bg-emerald-700">
+          <Check className="size-4" /> Выполнена
+        </button>
+      )}
+      {!isCancelled && !isDone && (
+        <button
+          onClick={() => { setTaskStatus(task.id, "Отменено"); toast("Задача отменена"); afterAction?.(); }}
+          className="flex items-center gap-1.5 rounded-lg border border-red-200 px-3.5 py-2 text-[13px] font-medium text-red-600 hover:bg-red-50">
+          <X className="size-4" /> Отменить
+        </button>
+      )}
+      {isCancelled && (
+        <button
+          onClick={() => { setTaskStatus(task.id, "Новая"); toast("Задача возобновлена"); afterAction?.(); }}
+          className="mr-auto flex items-center gap-1.5 rounded-lg border border-slate-200 px-3.5 py-2 text-[13px] font-medium text-slate-600 hover:bg-slate-50">
+          <RotateCcw className="size-4" /> Возобновить
+        </button>
+      )}
+      <button onClick={() => onDelete(task)}
+        className="flex items-center gap-1.5 rounded-lg border border-red-200 px-3.5 py-2 text-[13px] font-medium text-red-600 hover:bg-red-50">
+        <Trash2 className="size-4" /> Удалить
+      </button>
+      <button onClick={() => onEdit(task)}
+        className="flex items-center gap-1.5 rounded-lg bg-brand-600 px-4 py-2 text-[13px] font-medium text-white hover:bg-brand-700">
+        <Pencil className="size-4" /> Изменить
+      </button>
+    </>
+  );
+}
+
+function TaskViewModal({
+  task, onClose, onEdit, onDelete,
+}: { task: Task | null; onClose: () => void; onEdit: (t: Task) => void; onDelete: (t: Task) => void }) {
+  if (!task) return null;
+  return (
+    <Modal open onClose={onClose} title={`Задача № ${task.id}`} wide
+      footer={
+        <TaskDetailActions
+          task={task}
+          onEdit={(t) => { onClose(); onEdit(t); }}
+          onDelete={(t) => { onClose(); onDelete(t); }}
+          afterAction={onClose}
+        />
+      }>
+      <TaskDetailBody task={task} showOpenLink />
     </Modal>
   );
 }
@@ -482,7 +534,7 @@ export default function Tasks() {
 
       {/* ---------- КАНБАН ---------- */}
       {view === "kanban" && (
-        <div className="grid grid-cols-5 items-start gap-3.5 overflow-x-auto pb-2 max-xl:grid-cols-[repeat(5,270px)]">
+        <div className="grid grid-cols-5 items-start gap-2.5 pb-2 max-lg:grid-cols-[repeat(5,240px)] max-lg:overflow-x-auto">
           {columns.map(({ status, dot, ring }) => {
             const items = tasks.filter((t) => displayStatus(t) === status);
             const isOver = overCol === status && dragTask?.status !== status;
@@ -491,7 +543,7 @@ export default function Tasks() {
                 onDragOver={(e) => { e.preventDefault(); setOverCol(status); }}
                 onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setOverCol(null); }}
                 onDrop={(e) => { e.preventDefault(); onDrop(status); }}
-                className={`min-w-64 rounded-xl p-2.5 ring-2 transition-all ${
+                className={`min-w-0 rounded-xl p-2 ring-2 transition-all ${
                   isOver ? `${ring} ring-inset` : "bg-slate-100/70 ring-transparent"}`}>
                 <div className="flex items-center gap-2 px-1.5 pb-2.5 text-[13px] font-semibold">
                   <span className={`size-2 rounded-full ${dot}`} />
