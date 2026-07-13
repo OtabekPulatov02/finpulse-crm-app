@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Avatar, Menu, MenuDivider, MenuItem, Toaster, toast } from "./ui";
+import { FilePreviewer } from "./FilePreview";
 import { displayStatus, hydrateFromBot, isOverdue, resetTasksStore, useTasks } from "../store/tasks";
 import { hydrateClients, resetClientsStore, useClients } from "../store/clients";
 import { resetEmployeesStore } from "../store/employees";
@@ -310,6 +311,7 @@ export default function Layout() {
           <Outlet />
         </main>
         <Toaster />
+        <FilePreviewer />
       </div>
     </div>
   );
