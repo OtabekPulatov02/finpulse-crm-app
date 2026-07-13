@@ -432,3 +432,37 @@ export const fetchBotCategories = () =>
 
 export const saveBotCategories = (categories: BotCategory[]) =>
   post<{ ok: boolean; error?: string }>({ action: "bot_categories_save", categories });
+
+/* ---------------- AI ---------------- */
+const API_AI = `${ORIGIN}/api/ai`;
+
+export interface AiSettings { classify: boolean; drafts: boolean; summarize: boolean }
+
+async function aiGet<T>(params: string): Promise<T> {
+  const r = await fetch(`${API_AI}?${params}`, { signal: AbortSignal.timeout(20000), headers: authHeaders() });
+  return r.json();
+}
+async function aiPost<T>(body: Record<string, unknown>): Promise<T> {
+  const r = await fetch(API_AI, {
+    method: "POST",
+    headers: { "content-type": "application/json", ...authHeaders() },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(30000),
+  });
+  return r.json();
+}
+
+export const fetchAiPing = (test = false) =>
+  aiGet<{ ok: boolean; key: boolean; model: string; live?: boolean; error?: string }>(`r=ping${test ? "&test=1" : ""}`);
+
+export const fetchAiSettings = () =>
+  aiGet<{ ok: boolean; settings: AiSettings; key: boolean }>("r=settings");
+
+export const saveAiSettings = (settings: AiSettings) =>
+  aiPost<{ ok: boolean; error?: string }>({ action: "settings_save", settings });
+
+export const aiClassify = (text: string) =>
+  aiPost<{ ok: boolean; result: { category: string; sub: string | null } | null; error?: string }>({ action: "classify", text });
+
+export const aiDraft = (num: number) =>
+  aiPost<{ ok: boolean; draft?: Record<string, unknown>; error?: string }>({ action: "draft", num });
