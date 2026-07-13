@@ -11,7 +11,7 @@ import { useClients } from "../store/clients";
 import { hydrateEmployees, useEmployees } from "../store/employees";
 
 const donutColors: Record<string, string> = {
-  "Новая": "#8b5cf6", "В работе": "#2563eb", "Выполнена": "#10b981", "Архив": "#94a3b8",
+  "Новая": "#8b5cf6", "В работе": "#2563eb", "Выполнена": "#10b981", "Отменено": "#ef4444", "Архив": "#94a3b8",
 };
 
 function Donut({ data }: { data: { label: string; n: number; color: string }[] }) {
@@ -69,14 +69,14 @@ export default function Dashboard() {
   const today = tasks
     .filter((t) => {
       const s = displayStatus(t);
-      if (s === "Архив") return false;
+      if (s === "Архив" || s === "Отменено") return false;
       if (s === "Выполнена") return isDoneToday(t);
       return true;
     })
     .sort((a, b) => Number(a.status === "Выполнена") - Number(b.status === "Выполнена"))
     .slice(0, 5);
 
-  const donutData = ["Новая", "В работе", "Выполнена", "Архив"].map((label) => ({
+  const donutData = ["Новая", "В работе", "Выполнена", "Отменено", "Архив"].map((label) => ({
     label,
     n: tasks.filter((t) => displayStatus(t) === label).length,
     color: donutColors[label],

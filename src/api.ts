@@ -18,16 +18,25 @@ function authHeaders(): Record<string, string> {
   return h;
 }
 
-export type BotStatus = "new" | "in_progress" | "done";
+export type BotStatus = "new" | "in_progress" | "done" | "cancelled";
 
 export interface TaskAttachment {
   index: number;
   kind: "photo" | "document" | "video" | "voice" | "audio";
 }
 
+export interface ThreadMessage {
+  id: string;
+  at: string;
+  from: "staff" | "client";
+  by: string;
+  text: string | null;
+  fileIndex: number | null;
+}
+
 export interface BotTask {
   num: number;
-  company: string;
+  company: string | null;
   text: string;
   status: BotStatus;
   assignee: string | null;
@@ -37,6 +46,8 @@ export interface BotTask {
   dueDate?: string | null;
   source?: "bot" | "crm";
   doneAt?: string | null;
+  type?: "task" | "reminder";
+  thread?: ThreadMessage[];
 }
 
 export interface CrmClient {
@@ -184,6 +195,11 @@ export const attachTaskFileRequest = async (num: number, file: File) => {
     action: "task_attach_file", num, filename: file.name, mimeType: file.type, dataBase64,
   });
 };
+
+/* Отправка сообщения в чат задачи — доставляется в Telegram (сотруднику
+   клиенту в личку, клиенту в группу бухгалтеров) и сохраняется в ленту. */
+export const sendTaskMessageRequest = (num: number, text: string) =>
+  post<TaskResult>({ action: "task_message_send", num, text });
 
 /* Открывает вложение задачи в новой вкладке: заголовки авторизации нельзя
    передать через обычную ссылку/img, поэтому скачиваем как Blob через

@@ -1,23 +1,26 @@
 import { useEffect, useRef, useState } from "react";
-import { Hash, Kanban, LayoutList, Paperclip, Pencil, Plus, X } from "lucide-react";
+import { Hash, Kanban, LayoutList, Paperclip, Pencil, Plus, Send, X } from "lucide-react";
 import { Field, Input, Modal, Textarea, toast } from "../components/ui";
 import {
-  attachTaskFileRequest, createTaskRequest, fetchBotTasks, fmtTs, openTaskFile, updateTaskRequest, type BotTask,
+  attachTaskFileRequest, createTaskRequest, fetchBotTasks, fmtTs, openTaskFile,
+  sendTaskMessageRequest, updateTaskRequest, type BotTask,
 } from "../api";
 import { formatSumsInText } from "../lib/amount";
 
 const STATUS_LABEL: Record<BotTask["status"], string> = {
-  new: "Новая", in_progress: "В работе", done: "Выполнена",
+  new: "Новая", in_progress: "В работе", done: "Выполнена", cancelled: "Отменено",
 };
 const STATUS_TONE: Record<BotTask["status"], string> = {
   new: "bg-violet-50 text-violet-600 border-violet-200",
   in_progress: "bg-brand-50 text-brand-600 border-brand-200",
   done: "bg-emerald-50 text-emerald-600 border-emerald-200",
+  cancelled: "bg-red-50 text-red-600 border-red-200",
 };
 const COLUMNS: { status: BotTask["status"]; dot: string }[] = [
   { status: "new", dot: "bg-violet-500" },
   { status: "in_progress", dot: "bg-brand-500" },
   { status: "done", dot: "bg-emerald-500" },
+  { status: "cancelled", dot: "bg-red-500" },
 ];
 
 function StatusBadge({ status }: { status: BotTask["status"] }) {
@@ -26,6 +29,71 @@ function StatusBadge({ status }: { status: BotTask["status"] }) {
       <span className="size-1.5 rounded-full bg-current" />
       {STATUS_LABEL[status]}
     </span>
+  );
+}
+
+/* Чат по задаче — та же лента, что видна бухгалтерии в CRM. Сообщение,
+   отправленное клиентом отсюда, уходит в группу бухгалтеров в Telegram
+   (реплаем на карточку задачи), а всё, что бухгалтер пишет в Telegram,
+   появляется здесь при следующем обновлении. */
+function ClientTaskChat({ task, onSaved }: { task: BotTask; onSaved: (t: BotTask) => void }) {
+  const [text, setText] = useState("");
+  const [sending, setSending] = useState(false);
+  const thread = task.thread ?? [];
+  const bottomRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { bottomRef.current?.scrollIntoView({ block: "end" }); }, [thread.length]);
+
+  async function send() {
+    const t = text.trim();
+    if (!t || sending) return;
+    setSending(true);
+    try {
+      const r = await sendTaskMessageRequest(task.num, t);
+      if (r.ok && r.task) { onSaved(r.task); setText(""); }
+      else toast(r.error || "Не удалось отправить сообщение");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <div className="mt-1">
+      <div className="max-h-64 space-y-3 overflow-y-auto rounded-lg border border-slate-100 bg-slate-50/60 p-3">
+        {!thread.length && (
+          <p className="py-4 text-center text-xs text-slate-400">Сообщений пока нет — напишите, и бухгалтер увидит его в Telegram.</p>
+        )}
+        {thread.map((m) => (
+          <div key={m.id} className={`flex ${m.from === "client" ? "justify-end" : "justify-start"}`}>
+            <div className={`max-w-[80%] rounded-xl px-3 py-2 text-[13px] leading-snug ${
+              m.from === "client" ? "bg-brand-600 text-white" : "border border-slate-200 bg-white text-slate-700"}`}>
+              <div className={`mb-0.5 text-[11px] font-semibold ${m.from === "client" ? "text-brand-100" : "text-slate-400"}`}>
+                {m.from === "client" ? "Вы" : m.by}
+              </div>
+              {m.text && <div className="whitespace-pre-wrap">{m.text}</div>}
+              {m.fileIndex != null && (
+                <button type="button"
+                  onClick={() => openTaskFile(task.num, m.fileIndex as number).catch(() => toast("Не удалось открыть файл"))}
+                  className={`mt-1.5 flex items-center gap-1.5 rounded-md px-2 py-1 text-[12px] font-medium ${
+                    m.from === "client" ? "bg-white/15 hover:bg-white/25" : "bg-slate-100 hover:bg-slate-200"}`}>
+                  <Paperclip className="size-3.5" /> Вложение
+                </button>
+              )}
+              <div className={`mt-1 text-right text-[10px] ${m.from === "client" ? "text-brand-100/80" : "text-slate-400"}`}>{fmtTs(m.at)}</div>
+            </div>
+          </div>
+        ))}
+        <div ref={bottomRef} />
+      </div>
+      <div className="mt-2 flex items-end gap-2">
+        <Textarea value={text} onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(); } }}
+          placeholder="Написать бухгалтеру…" rows={2} className="flex-1" />
+        <button type="button" disabled={sending || !text.trim()} onClick={send}
+          className="flex h-full items-center gap-1.5 self-stretch rounded-lg bg-brand-600 px-3.5 text-[13px] font-medium text-white hover:bg-brand-700 disabled:opacity-50">
+          <Send className="size-4" />
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -48,7 +116,8 @@ function TaskFormModal({
     setText(task?.text ?? "");
     setDueDate(task?.dueDate ?? "");
     setFile(null);
-  }, [task, open]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [task?.num, open]);
 
   async function submit() {
     if (!text.trim()) { toast("Опишите задачу текстом"); return; }
@@ -135,6 +204,11 @@ function TaskFormModal({
             </div>
           )}
         </Field>
+        {edit && task && (
+          <Field label="Чат по задаче">
+            <ClientTaskChat task={task} onSaved={onSaved} />
+          </Field>
+        )}
       </div>
     </Modal>
   );
@@ -161,6 +235,9 @@ export default function ClientTasks() {
       const exists = prev.some((x) => x.num === t.num);
       return exists ? prev.map((x) => (x.num === t.num ? t : x)) : [t, ...prev];
     });
+    /* Чат внутри открытой модалки должен сразу увидеть новое сообщение —
+       иначе editTask остаётся "замороженным" на моменте открытия формы. */
+    setEditTask((prev) => (prev && prev.num === t.num ? t : prev));
   }
 
   function openCreate() { setEditTask(null); setFormOpen(true); }
@@ -207,7 +284,7 @@ export default function ClientTasks() {
 
       {/* ---------- КАНБАН (только просмотр статуса — без перетаскивания) ---------- */}
       {tasks !== null && tasks.length > 0 && view === "kanban" && (
-        <div className="grid grid-cols-3 gap-3.5 overflow-x-auto pb-2 max-xl:grid-cols-[repeat(3,300px)]">
+        <div className="grid grid-cols-4 gap-3.5 overflow-x-auto pb-2 max-xl:grid-cols-[repeat(4,300px)]">
           {COLUMNS.map(({ status, dot }) => {
             const items = tasks.filter((t) => t.status === status);
             return (
