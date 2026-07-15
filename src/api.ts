@@ -395,7 +395,7 @@ const API_1C = `${ORIGIN}/api/1c`;
 
 export interface App1C {
   code: string; path: string; name: string;
-  reachable?: boolean; entities?: number | null; ready?: boolean; error?: string;
+  reachable?: boolean; status?: number; entities?: number | null; ready?: boolean; error?: string;
 }
 
 async function get1c<T>(params: string): Promise<T> {

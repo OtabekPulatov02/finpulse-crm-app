@@ -98,7 +98,7 @@ export default function Integration1C() {
                       ? <Badge tone="green">готов</Badge>
                       : a.reachable
                         ? <Badge tone="yellow">состав пуст</Badge>
-                        : <Badge tone="gray">нет доступа</Badge>}
+                        : <Badge tone="gray">{a.status === 401 ? "401: логин/пароль" : a.status === 403 ? "403: нет прав" : a.status ? `ошибка ${a.status}` : "нет соединения"}</Badge>}
                   </td>
                   <td className="px-4 py-3 text-slate-500">{a.entities ?? "—"}</td>
                   <td className="px-4 py-3 text-right">
