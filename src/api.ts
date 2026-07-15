@@ -476,5 +476,17 @@ export const saveBotPositions = (positions: string[]) =>
 export interface AgentMessage { role: "user" | "assistant"; content: string }
 export interface AgentStep { tool: string; args: string; ok: boolean }
 
-export const aiAgent = (messages: AgentMessage[]) =>
-  aiPost<{ ok: boolean; reply: string; steps?: AgentStep[]; error?: string }>({ action: "agent", messages });
+export const aiAgent = (messages: AgentMessage[], chatId?: string | null) =>
+  aiPost<{ ok: boolean; reply: string; steps?: AgentStep[]; chatId?: string; error?: string }>({ action: "agent", messages, chatId });
+
+export interface AiChatMeta { id: string; title: string; updatedAt: string; count: number }
+export interface StoredChatMsg { role: "user" | "assistant"; content: string; steps?: AgentStep[] }
+
+export const fetchAiChats = () =>
+  aiGet<{ ok: boolean; chats: AiChatMeta[] }>("r=chats").then((d) => d.chats ?? []);
+
+export const fetchAiChat = (id: string) =>
+  aiGet<{ ok: boolean; messages: StoredChatMsg[] }>(`r=chat&id=${encodeURIComponent(id)}`).then((d) => d.messages ?? []);
+
+export const deleteAiChat = (id: string) =>
+  aiPost<{ ok: boolean }>({ action: "chat_delete", id });
