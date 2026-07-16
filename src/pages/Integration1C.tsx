@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Activity, ArrowLeftRight, CheckCircle2, CloudOff, Database, RefreshCw, RefreshCwOff } from "lucide-react";
 import { Badge, Card, CardHeader, toast } from "../components/ui";
-import { fetch1cDoclog, fetch1cPing, sync1cContracts, sync1cCounterparties, sync1cNomenclature, sync1cOrgs, type App1C, type Doc1cLogItem } from "../api";
+import { fetch1cDoclog, fetch1cPing, fetch1cReports, sync1cContracts, sync1cCounterparties, sync1cNomenclature, sync1cOrgs, sync1cReports, type App1C, type Doc1cLogItem, type Report1cItem } from "../api";
 
 /* Маппинг реквизитов 1С («Организации», БУ УЗ 3.0) → поля карточки клиента CRM */
 const FIELD_MAP: [string, string][] = [
@@ -26,6 +26,8 @@ export default function Integration1C() {
   const [syncing, setSyncing] = useState<string | null>(null);
   const [syncingAll, setSyncingAll] = useState(false);
   const [doclog, setDoclog] = useState<Doc1cLogItem[] | null>(null);
+  const [reports, setReports] = useState<Report1cItem[] | null>(null);
+  const [reportsNote, setReportsNote] = useState<string | null>(null);
 
   const load = () => {
     setLoading(true);
@@ -38,6 +40,10 @@ export default function Integration1C() {
   useEffect(() => {
     fetch1cDoclog(30).then((r) => { if (r.ok) setDoclog(r.items ?? []); }).catch(() => {});
   }, []);
+  const loadReports = () => {
+    fetch1cReports().then((r) => { if (r.ok) { setReports(r.items ?? []); setReportsNote(r.note ?? null); } }).catch(() => {});
+  };
+  useEffect(loadReports, []);
 
   const doSync = async (a: App1C) => {
     setSyncing(a.code);
@@ -65,6 +71,15 @@ export default function Integration1C() {
     try {
       const r = await sync1cNomenclature(a.code);
       if (r.ok) toast(`«${a.name}»: номенклатуры сопоставлено ${r.mapped ?? 0} из ${r.total ?? 0}`);
+      else toast(r.error || "Синхронизация не удалась");
+    } finally { setSyncing(null); }
+  };
+
+  const doSyncReports = async (a: App1C) => {
+    setSyncing(a.code);
+    try {
+      const r = await sync1cReports(a.code);
+      if (r.ok) { toast(`«${a.name}»: видов отчётности ${r.types ?? 0} из ${r.total ?? 0} записей`); loadReports(); }
       else toast(r.error || "Синхронизация не удалась");
     } finally { setSyncing(null); }
   };
@@ -170,6 +185,12 @@ export default function Integration1C() {
                         className="rounded-lg border border-slate-200 px-3 py-1.5 text-[12.5px] font-medium hover:bg-slate-50 disabled:opacity-40">
                         {syncing === a.code ? "…" : "Синк номенклатуры"}
                       </button>
+                      <button
+                        onClick={() => doSyncReports(a)}
+                        disabled={!a.ready || syncing === a.code}
+                        className="rounded-lg border border-slate-200 px-3 py-1.5 text-[12.5px] font-medium hover:bg-slate-50 disabled:opacity-40">
+                        {syncing === a.code ? "…" : "Синк отчётности"}
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -216,6 +237,46 @@ export default function Integration1C() {
         )}
       </Card>
 
+      <Card>
+        <CardHeader title="Календарь регламентированной отчётности" action={<Activity className="size-4 text-slate-400" />} />
+        {reports && reports.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-[13px]">
+              <thead>
+                <tr className="border-b border-slate-100 text-[11px] uppercase tracking-wide text-slate-400">
+                  <th className="px-4 py-2 font-medium">Отчёт</th>
+                  <th className="px-4 py-2 font-medium">Компания</th>
+                  <th className="px-4 py-2 font-medium">Периодичность</th>
+                  <th className="px-4 py-2 font-medium">Последний период</th>
+                  <th className="px-4 py-2 font-medium">Ожидаемый следующий</th>
+                  <th className="px-4 py-2 font-medium" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {reports.map((r, i) => (
+                  <tr key={i} className="hover:bg-slate-50">
+                    <td className="px-4 py-2 font-medium">{r.name}</td>
+                    <td className="px-4 py-2 text-slate-500">{r.appName}</td>
+                    <td className="px-4 py-2 text-slate-500">{r.periodicity}</td>
+                    <td className="px-4 py-2 text-slate-500">{r.lastPeriodLabel}</td>
+                    <td className="px-4 py-2 text-slate-500">{new Date(r.nextExpectedPeriodEnd).toLocaleDateString("ru-RU")}</td>
+                    <td className="px-4 py-2">
+                      {r.periodsSkipped > 0 && <Badge tone="yellow">давно не готовили ({r.periodsSkipped})</Badge>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="p-8 text-center text-sm text-slate-400">Пока нет данных — нажмите «Синк отчётности» у нужной базы выше</div>
+        )}
+        <div className="flex items-start gap-2.5 border-t border-slate-100 px-5 py-3.5 text-[12.5px] text-slate-500">
+          <CloudOff className="mt-0.5 size-4 shrink-0 text-slate-400" />
+          {reportsNote || "Это ориентир, выведенный из истории и периодичности отчёта в 1С — НЕ официальный срок сдачи (1С его не хранит отдельным полем). Всегда сверяйте с реальным законодательным сроком."}
+        </div>
+      </Card>
+
       <div className="grid grid-cols-2 gap-4 max-lg:grid-cols-1">
         <Card>
           <CardHeader title="Маппинг полей: 1С → CRM" action={<ArrowLeftRight className="size-4 text-slate-400" />} />
@@ -237,7 +298,8 @@ export default function Integration1C() {
               ["готово", "Обороты по счёту за период (без разбивки по контрагентам — не публикуется через OData в этой конфигурации)"],
               ["ждём Clobus", "PRESTIGE CLUB: включение состава OData поддержкой (ошибка 404) — заявка в поддержку отправлена"],
               ["невозможно", "Чтение входящих документов ЭДО/Didox и напоминаний/задач бухгалтера из 1С — соответствующие сущности не публикуются через OData в этой конфигурации"],
-              ["дальше", "Статусы отчётности; разбивка задолженности по контрагентам, если Clobus когда-нибудь откроет субконто через OData"],
+              ["готово", "Календарь регламентированной отчётности: последний подготовленный период по каждому виду отчёта + ориентировочный следующий (выведено из истории, не официальный срок из 1С)"],
+              ["дальше", "Разбивка задолженности по контрагентам, если Clobus когда-нибудь откроет субконто через OData"],
             ].map(([tag, text], i) => (
               <div key={i} className="flex items-start gap-2.5">
                 <CheckCircle2 className={`mt-0.5 size-4 shrink-0 ${tag === "готово" ? "text-emerald-500" : tag === "ждём Clobus" ? "text-amber-500" : tag === "невозможно" ? "text-rose-400" : "text-slate-300"}`} />

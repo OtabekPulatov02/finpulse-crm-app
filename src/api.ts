@@ -455,6 +455,25 @@ export interface Doc1cLogItem {
 export const fetch1cDoclog = (limit = 50) =>
   get1c<{ ok: boolean; items?: Doc1cLogItem[]; error?: string }>(`r=doclog&limit=${limit}`);
 
+export interface Report1cItem {
+  name: string; periodicity: string; lastPeriodLabel: string; lastPeriodEnd: string;
+  lastPreparedAt: string; nextExpectedPeriodEnd: string; periodsSkipped: number;
+  appCode: string; appName: string;
+}
+
+export const fetch1cReports = () =>
+  get1c<{ ok: boolean; items?: Report1cItem[]; note?: string; error?: string }>("r=reports");
+
+export const sync1cReports = async (app: string) => {
+  const r = await fetch(API_1C, {
+    method: "POST",
+    headers: { "content-type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ action: "sync_reports", app }),
+    signal: AbortSignal.timeout(30000),
+  });
+  return r.json() as Promise<{ ok: boolean; total?: number; types?: number; error?: string }>;
+};
+
 /* ---------------- Настройки бота и категории услуг ---------------- */
 export interface BotSettings { slaHours: number; workStart: number; workEnd: number; tzOffset: number }
 export interface BotCategory { id: string; name: string; subs: string[] }
