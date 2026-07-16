@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Activity, ArrowLeftRight, CheckCircle2, CloudOff, Database, RefreshCw } from "lucide-react";
+import { Activity, ArrowLeftRight, CheckCircle2, CloudOff, Database, RefreshCw, RefreshCwOff } from "lucide-react";
 import { Badge, Card, CardHeader, toast } from "../components/ui";
 import { fetch1cPing, sync1cOrgs, type App1C } from "../api";
 
@@ -24,6 +24,7 @@ export default function Integration1C() {
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState<string | null>(null);
+  const [syncingAll, setSyncingAll] = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -41,6 +42,24 @@ export default function Integration1C() {
       if (r.ok) toast(`«${a.name}»: организаций ${r.total ?? 0}, новых карточек ${r.created ?? 0}, обновлено ${r.updated ?? 0}`);
       else toast(r.error || "Синхронизация не удалась");
     } finally { setSyncing(null); }
+  };
+
+  const doSyncAll = async () => {
+    const targets = (apps ?? []).filter((a) => a.ready);
+    if (!targets.length) { toast("Нет баз, готовых к синку"); return; }
+    setSyncingAll(true);
+    let ok = 0, failed = 0, created = 0, updated = 0;
+    try {
+      for (const a of targets) {
+        setSyncing(a.code);
+        try {
+          const r = await sync1cOrgs(a.code);
+          if (r.ok) { ok++; created += r.created ?? 0; updated += r.updated ?? 0; }
+          else failed++;
+        } catch { failed++; }
+      }
+      toast(`Синк всех баз: ${ok} успешно${failed ? `, ${failed} с ошибкой` : ""} · новых карточек ${created}, обновлено ${updated}`);
+    } finally { setSyncing(null); setSyncingAll(false); }
   };
 
   const readyCount = apps?.filter((a) => a.ready).length ?? 0;
@@ -69,6 +88,11 @@ export default function Integration1C() {
         <CardHeader title={`Базы (${apps?.length ?? 0})`} action={
           <div className="flex items-center gap-3">
             {apps && <span className="text-xs text-slate-400">{readyCount} из {apps.length} готовы к обмену</span>}
+            <button onClick={doSyncAll} disabled={!readyCount || syncingAll || !!syncing}
+              className="flex items-center gap-1.5 rounded-lg border border-brand-200 bg-brand-50 px-3 py-1.5 text-[12.5px] font-medium text-brand-700 hover:bg-brand-100 disabled:opacity-40">
+              {syncingAll ? <RefreshCwOff className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
+              {syncingAll ? "Синхронизация всех…" : "Синк всех организаций"}
+            </button>
             <button onClick={load} disabled={loading}
               className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-[12.5px] font-medium hover:bg-slate-50 disabled:opacity-50">
               <RefreshCw className={`size-3.5 ${loading ? "animate-spin" : ""}`} /> Проверить
