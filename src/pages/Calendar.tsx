@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlarmClockPlus, ChevronLeft, ChevronRight, CreditCard, ExternalLink, ListTodo, Plus, Receipt, Send, Trash2 } from "lucide-react";
+import { AlarmClockPlus, ChevronLeft, ChevronRight, CreditCard, ExternalLink, FileStack, ListTodo, Plus, Receipt, Send, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Badge, Card, CardHeader, ConfirmModal, Modal, toast } from "../components/ui";
 import { useTasks } from "../store/tasks";
 import { hydrateClients, useClients } from "../store/clients";
 import { createCalendarEvent, hydrateCalendarEvents, removeCalendarEvent, useCalendarEvents } from "../store/calendarEvents";
 import type { CalendarEventEntry } from "../api";
+import { fetch1cReports } from "../api";
 import { formatSumsInText } from "../lib/amount";
 
-type EvType = "tax" | "pay" | "task";
+type EvType = "tax" | "pay" | "task" | "report";
 interface Ev {
   key: string; date: Date; type: EvType; title: string; company: string;
   repeat: string; remindDays: number | null; id?: string; taskNum?: number;
@@ -23,12 +24,13 @@ const pill: Record<EvType, string> = {
   tax: "bg-violet-50 text-violet-600 border-l-violet-500",
   pay: "bg-brand-50 text-brand-600 border-l-brand-500",
   task: "bg-amber-50 text-amber-600 border-l-amber-500",
+  report: "bg-teal-50 text-teal-600 border-l-teal-500",
 };
-const typeIcon: Record<EvType, typeof Receipt> = { tax: Receipt, pay: CreditCard, task: ListTodo };
+const typeIcon: Record<EvType, typeof Receipt> = { tax: Receipt, pay: CreditCard, task: ListTodo, report: FileStack };
 const typeIconBg: Record<EvType, string> = {
-  tax: "bg-violet-50 text-violet-600", pay: "bg-brand-50 text-brand-600", task: "bg-amber-50 text-amber-600",
+  tax: "bg-violet-50 text-violet-600", pay: "bg-brand-50 text-brand-600", task: "bg-amber-50 text-amber-600", report: "bg-teal-50 text-teal-600",
 };
-const typeName: Record<EvType, string> = { tax: "Налог / отчёт", pay: "Платёж", task: "Задача" };
+const typeName: Record<EvType, string> = { tax: "Налог / отчёт", pay: "Платёж", task: "Задача", report: "Отчётность 1С (ожид. период)" };
 
 const REPEAT_LABEL: Record<CalendarEventEntry["repeat"], string> = {
   once: "Однократно", monthly: "Ежемесячно", quarterly: "Ежеквартально", yearly: "Ежегодно",
@@ -54,6 +56,23 @@ export default function Calendar() {
   const calendarEvents = useCalendarEvents();
   useEffect(() => { void hydrateClients(); void hydrateCalendarEvents(); }, []);
 
+  // Отчётность 1С (Document_РегламентированныйОтчет по всем синканным базам) —
+  // "ожидаемый период" выведен из истории/периодичности, не официальный срок
+  // сдачи (см. note ниже), но по просьбе — теперь виден прямо в календаре.
+  const [reports1c, setReports1c] = useState<{ key: string; date: Date; title: string; company: string; skipped: number }[]>([]);
+  useEffect(() => {
+    fetch1cReports().then((r) => {
+      if (!r.ok) return;
+      setReports1c((r.items ?? []).map((it, i) => ({
+        key: `1c:${it.appCode}:${it.name}:${i}`,
+        date: parseISODate(it.nextExpectedPeriodEnd),
+        title: `${it.name} (${it.appName})`,
+        company: it.appName,
+        skipped: it.periodsSkipped,
+      })));
+    }).catch(() => {});
+  }, []);
+
   const events: Ev[] = useMemo(() => {
     const fromTasks: Ev[] = tasks
       .filter((t) => t.dueDate && t.status !== "Выполнена" && t.status !== "Отменено")
@@ -68,8 +87,12 @@ export default function Calendar() {
         title: e.title, company: e.company || "Все клиенты",
         repeat: REPEAT_LABEL[e.repeat], remindDays: e.remindDays, id: e.id,
       }));
-    return [...fromTasks, ...fromEvents];
-  }, [tasks, calendarEvents]);
+    const fromReports: Ev[] = reports1c.map((r) => ({
+      key: r.key, date: r.date, type: "report" as const,
+      title: r.title, company: r.company, repeat: "", remindDays: null,
+    }));
+    return [...fromTasks, ...fromEvents, ...fromReports];
+  }, [tasks, calendarEvents, reports1c]);
 
   const [cur, setCur] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
   const [filter, setFilter] = useState<"all" | EvType>("all");
@@ -148,7 +171,7 @@ export default function Calendar() {
             <button onClick={() => setCur(new Date(cur.getFullYear(), cur.getMonth() + 1, 1))} className="rounded-lg border border-slate-200 p-1.5 hover:bg-slate-50"><ChevronRight className="size-4" /></button>
             <button onClick={() => setCur(new Date(today.getFullYear(), today.getMonth(), 1))} className="rounded-lg px-3 py-1.5 text-[13px] font-medium text-slate-500 hover:bg-slate-100">Сегодня</button>
             <div className="ml-auto flex flex-wrap gap-1.5">
-              {([["all", "Все"], ["tax", "Налоги"], ["pay", "Платежи"], ["task", "Задачи"]] as const).map(([v, l]) => (
+              {([["all", "Все"], ["tax", "Налоги"], ["pay", "Платежи"], ["task", "Задачи"], ["report", "Отчётность 1С"]] as const).map(([v, l]) => (
                 <button key={v} onClick={() => setFilter(v)}
                   className={`rounded-full border px-3 py-1 text-xs font-medium transition ${filter === v ? "border-brand-200 bg-brand-50 text-brand-600" : "border-slate-200 text-slate-500 hover:border-slate-300"}`}>
                   {l}
@@ -228,6 +251,11 @@ export default function Calendar() {
                       <button onClick={() => { setDay(null); navigate(`/tasks?open=${e.taskNum}`); }}
                         className="flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium hover:bg-slate-50">
                         <ExternalLink className="size-3.5" />Открыть задачу
+                      </button>
+                    ) : e.type === "report" ? (
+                      <button onClick={() => { setDay(null); navigate("/integrations/1c"); }}
+                        className="flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium hover:bg-slate-50">
+                        <ExternalLink className="size-3.5" />В разделе «1С»
                       </button>
                     ) : (
                       <button onClick={() => setDeleteEv(e)}
