@@ -437,6 +437,16 @@ export const sync1cNomenclature = async (app: string) => {
   return r.json() as Promise<{ ok: boolean; total?: number; mapped?: number; error?: string }>;
 };
 
+export const sync1cContracts = async (app: string) => {
+  const r = await fetch(API_1C, {
+    method: "POST",
+    headers: { "content-type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ action: "sync_contracts", app }),
+    signal: AbortSignal.timeout(30000),
+  });
+  return r.json() as Promise<{ ok: boolean; total?: number; owners?: number; defaults?: number; error?: string }>;
+};
+
 /* ---------------- Настройки бота и категории услуг ---------------- */
 export interface BotSettings { slaHours: number; workStart: number; workEnd: number; tzOffset: number }
 export interface BotCategory { id: string; name: string; subs: string[] }

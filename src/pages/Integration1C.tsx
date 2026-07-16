@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Activity, ArrowLeftRight, CheckCircle2, CloudOff, Database, RefreshCw, RefreshCwOff } from "lucide-react";
 import { Badge, Card, CardHeader, toast } from "../components/ui";
-import { fetch1cPing, sync1cCounterparties, sync1cNomenclature, sync1cOrgs, type App1C } from "../api";
+import { fetch1cPing, sync1cContracts, sync1cCounterparties, sync1cNomenclature, sync1cOrgs, type App1C } from "../api";
 
 /* Маппинг реквизитов 1С («Организации», БУ УЗ 3.0) → поля карточки клиента CRM */
 const FIELD_MAP: [string, string][] = [
@@ -44,11 +44,14 @@ export default function Integration1C() {
     } finally { setSyncing(null); }
   };
 
+  /* контрагенты и их договоры синкаются вместе одной кнопкой — договор без контрагента бессмыслен,
+     а раздельные кнопки только загромождали бы таблицу */
   const doSyncCp = async (a: App1C) => {
     setSyncing(a.code);
     try {
       const r = await sync1cCounterparties(a.code);
-      if (r.ok) toast(`«${a.name}»: контрагентов сопоставлено ${r.mapped ?? 0} из ${r.total ?? 0}`);
+      const rc = await sync1cContracts(a.code);
+      if (r.ok) toast(`«${a.name}»: контрагентов ${r.mapped ?? 0} из ${r.total ?? 0}` + (rc.ok ? `, договоров ${rc.total ?? 0}` : ""));
       else toast(r.error || "Синхронизация не удалась");
     } finally { setSyncing(null); }
   };
