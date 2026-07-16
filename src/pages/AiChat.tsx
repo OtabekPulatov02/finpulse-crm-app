@@ -6,7 +6,7 @@ import {
   type AgentMessage, type AgentStep, type AiChatMeta,
 } from "../api";
 
-interface ChatItem { role: "user" | "assistant"; content: string; steps?: AgentStep[] }
+interface ChatItem { role: "user" | "assistant"; content: string; steps?: AgentStep[]; askOptions?: string[] }
 
 function renderInline(text: string, keyPrefix: string) {
   const parts: (string | JSX.Element)[] = [];
@@ -93,7 +93,7 @@ export default function AiChat() {
     try {
       const history: AgentMessage[] = next.map((i) => ({ role: i.role, content: i.content }));
       const r = await aiAgent(history, activeId);
-      setItems([...next, { role: "assistant", content: r.ok ? r.reply : (r.error || "Ошибка агента"), steps: r.steps }]);
+      setItems([...next, { role: "assistant", content: r.ok ? r.reply : (r.error || "Ошибка агента"), steps: r.steps, askOptions: r.askOptions }]);
       if (r.chatId) {
         setActiveId(r.chatId);
         fetchAiChats().then(setChats).catch(() => {});
@@ -176,6 +176,18 @@ export default function AiChat() {
                       m.role === "user" ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-800"}`}>
                       <MessageContent text={m.content} />
                     </div>
+                    {m.role === "assistant" && m.askOptions && m.askOptions.length > 0 && i === items.length - 1 && (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {m.askOptions.map((opt, oi) => (
+                          <button key={oi} type="button" disabled={busy}
+                            onClick={() => send(opt)}
+                            className="rounded-full border border-brand-200 bg-white px-3 py-1.5 text-[12.5px] font-medium text-brand-700 hover:bg-brand-50 disabled:opacity-50">
+                            {opt}
+                          </button>
+                        ))}
+                        <span className="px-1 py-1.5 text-[12px] text-slate-400">или напишите свой вариант ниже</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
