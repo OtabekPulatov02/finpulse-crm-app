@@ -550,3 +550,6 @@ export const fetchAiChat = (id: string) =>
 
 export const deleteAiChat = (id: string) =>
   aiPost<{ ok: boolean }>({ action: "chat_delete", id });
+
+export const clearAllAiChats = () =>
+  aiPost<{ ok: boolean; cleared: number }>({ action: "chat_clear_all" });
