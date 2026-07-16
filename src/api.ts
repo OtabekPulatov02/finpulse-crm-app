@@ -180,7 +180,7 @@ export const createClientRequest = (data: {
 }) => post<ClientResult>({ action: "client_create", ...data });
 
 export const updateClientRequest = (id: string, patch: Partial<Pick<CrmClient,
-  "status" | "assignedTo" | "tariff" | "note" | "position" | "inn" | "mfo" | "bankAccount" | "address" | "fullName" | "pinfl" | "vatCode" | "taxSystem" | "bank" | "director" | "taxOffice"
+  "status" | "assignedTo" | "tariff" | "note" | "position" | "inn" | "mfo" | "bankAccount" | "address" | "fullName" | "pinfl" | "vatCode" | "taxSystem" | "bank" | "director" | "taxOffice" | "phone"
 >>) => post<ClientResult>({ action: "client_update", id, patch });
 
 export const deleteClientRequest = (id: string) =>

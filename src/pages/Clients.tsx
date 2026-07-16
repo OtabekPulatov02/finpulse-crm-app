@@ -8,6 +8,7 @@ import {
   MenuItem, Modal, Select, Textarea, toast, type Tone,
 } from "../components/ui";
 import { useEmployees, hydrateEmployees } from "../store/employees";
+import { useSession } from "../auth";
 import type { AccessRequest, CrmClient } from "../api";
 import { fetchAccessRequests, resolveAccessRequest, addOpsPack, fetchBotPositions, fetchTariffs, fetchUsage, type ClientUsage, type Tariff } from "../api";
 import { createClient, hydrateClients, patchClient, removeClient, useClients } from "../store/clients";
@@ -35,6 +36,7 @@ function ClientFormModal({
   useEffect(() => { void hydrateEmployees(); }, []);
   const employeeNames = employees.filter((e) => e.active).map((e) => e.name);
   const edit = !!client;
+  const isAdmin = useSession()?.role === "admin";
   const [company, setCompany] = useState(client?.company ?? "");
   const [phone, setPhone] = useState(edit ? formatPhone(client?.phone ?? "") : "");
   const [position, setPosition] = useState(client?.position ?? "");
@@ -60,6 +62,7 @@ function ClientFormModal({
     try {
       if (edit && client) {
         const r = await patchClient(client.id, {
+          ...(isAdmin ? { phone: phone || null } : {}),
           position: position || null, tariff: tariff || null, assignedTo: assignedTo || null, note: note || null,
           inn: inn || null, mfo: mfo || null, bankAccount: bankAccount || null, address: address || null,
           fullName: fullName || null, pinfl: pinfl || null, vatCode: vatCode || null, taxSystem: taxSystem || null,
@@ -93,9 +96,11 @@ function ClientFormModal({
         <Field label="Название компании" required>
           <Input placeholder="ООО «Название»" value={company} onChange={(e) => setCompany(e.target.value)} disabled={edit} autoFocus={!edit} />
         </Field>
-        {edit && <p className="-mt-2 text-xs text-slate-400">Название и телефон компании нельзя изменить из карточки — они привязаны к регистрации в Telegram.</p>}
+        {edit && <p className="-mt-2 text-xs text-slate-400">Название компании фиксировано; телефон (ключ привязки Telegram и логин кабинета) может менять только супер-админ.</p>}
         <div className="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
-          <Field label="Телефон"><Input type="tel" placeholder="+998 90 000-00-00" value={phone} onChange={(e) => setPhone(e.target.value)} disabled={edit} /></Field>
+          <Field label={edit && isAdmin ? "Телефон (меняет только супер-админ)" : "Телефон"}>
+            <Input type="tel" placeholder="+998 90 000-00-00" value={phone} onChange={(e) => setPhone(e.target.value)} disabled={edit && !isAdmin} />
+          </Field>
           <Field label="Должность контакта">
             <Select value={positionOptions.includes(position) ? position : position ? "__custom" : ""}
               onChange={(e) => { if (e.target.value !== "__custom") setPosition(e.target.value); }}>

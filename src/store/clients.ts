@@ -53,7 +53,7 @@ export async function createClient(data: {
 
 export async function patchClient(
   id: string,
-  patch: Partial<Pick<CrmClient, "status" | "assignedTo" | "tariff" | "note" | "position" | "inn" | "mfo" | "bankAccount" | "address" | "fullName" | "pinfl" | "vatCode" | "taxSystem" | "bank" | "director" | "taxOffice">>,
+  patch: Partial<Pick<CrmClient, "status" | "assignedTo" | "tariff" | "note" | "position" | "inn" | "mfo" | "bankAccount" | "address" | "fullName" | "pinfl" | "vatCode" | "taxSystem" | "bank" | "director" | "taxOffice" | "phone">>,
 ): Promise<{ ok: boolean; error?: string }> {
   const r = await updateClientRequest(id, patch);
   if (r.ok && r.client) {
