@@ -474,7 +474,7 @@ export const saveBotCategories = (categories: BotCategory[]) =>
 /* ---------------- AI ---------------- */
 const API_AI = `${ORIGIN}/api/ai`;
 
-export interface AiSettings { classify: boolean; drafts: boolean; summarize: boolean }
+export interface AiSettings { classify: boolean; drafts: boolean; summarize: boolean; autoWork: boolean }
 
 async function aiGet<T>(params: string): Promise<T> {
   const r = await fetch(`${API_AI}?${params}`, { signal: AbortSignal.timeout(20000), headers: authHeaders() });

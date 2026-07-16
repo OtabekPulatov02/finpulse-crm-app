@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Bot, FileText, MessageSquareText, RefreshCw, Sparkles, Tags, Wand2 } from "lucide-react";
+import { Bot, FileText, MessageSquareText, RefreshCw, Sparkles, Tags, Wand2, Zap } from "lucide-react";
 import { Badge, Card, CardHeader, Toggle, toast } from "../components/ui";
 import { aiClassify, fetchAiPing, fetchAiSettings, saveAiSettings, type AiSettings } from "../api";
 
@@ -8,6 +8,12 @@ const FEATURES: { key: keyof AiSettings; icon: typeof Tags; title: string; desc:
   { key: "drafts", icon: FileText, title: "Черновики операций", desc: "Из текста заявки ИИ готовит структурированный черновик (контрагент, сумма, назначение) — бухгалтер проверяет и проводит через Didox" },
   { key: "summarize", icon: MessageSquareText, title: "Суммаризация переписки", desc: "Краткая выжимка длинных обращений клиента в карточке задачи" },
 ];
+
+const AUTONOMY: { key: keyof AiSettings; icon: typeof Zap; title: string; desc: string } = {
+  key: "autoWork", icon: Zap,
+  title: "Автономный ИИ-бухгалтер",
+  desc: "Как только приходит новая заявка (из бота или CRM), ИИ сам берёт её в работу: готовит черновик и создаёт непроведённый документ в 1С. Если не уверен — задаёт уточняющий вопрос реплаем в группе бухгалтеров и ждёт ответа. Обо всём отчитывается в группе и в чате задачи.",
+};
 
 export default function IntegrationAI() {
   const [ping, setPing] = useState<{ ok: boolean; key: boolean; model: string; error?: string } | null>(null);
@@ -18,7 +24,7 @@ export default function IntegrationAI() {
 
   useEffect(() => {
     fetchAiPing().then(setPing).catch(() => setPing({ ok: false, key: false, model: "?", error: "Мост AI недоступен" }));
-    fetchAiSettings().then((r) => setSettings(r.settings)).catch(() => setSettings({ classify: true, drafts: true, summarize: true }));
+    fetchAiSettings().then((r) => setSettings(r.settings)).catch(() => setSettings({ classify: true, drafts: true, summarize: true, autoWork: false }));
   }, []);
 
   const toggle = async (key: keyof AiSettings) => {
@@ -105,6 +111,25 @@ export default function IntegrationAI() {
       </Card>
 
       <Card>
+        <CardHeader title="Автономность" action={<AUTONOMY.icon className="size-4 text-slate-400" />} />
+        <div className="flex items-center gap-4 px-5 py-4">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-amber-50 text-amber-600">
+            <AUTONOMY.icon className="size-[18px]" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="text-[13.5px] font-semibold">{AUTONOMY.title}</div>
+            <div className="mt-0.5 text-[12.5px] leading-relaxed text-slate-500">{AUTONOMY.desc}</div>
+          </div>
+          <Toggle checked={!!settings?.autoWork} onChange={() => toggle("autoWork")} />
+        </div>
+        {settings?.autoWork && (
+          <div className="border-t border-amber-100 bg-amber-50 px-5 py-3 text-[12.5px] text-amber-700">
+            Включено: ИИ будет самостоятельно создавать непроведённые документы в 1С по новым заявкам без подтверждения на каждый шаг. Проверяйте карточки в 1С перед проведением.
+          </div>
+        )}
+      </Card>
+
+      <Card>
         <CardHeader title="Проверка классификации" action={<Wand2 className="size-4 text-slate-400" />} />
         <div className="space-y-3 p-5">
           <textarea value={probe} onChange={(e) => setProbe(e.target.value)} rows={2}
@@ -120,7 +145,9 @@ export default function IntegrationAI() {
         </div>
         <div className="flex items-start gap-2.5 border-t border-slate-100 px-5 py-3.5 text-[12.5px] text-slate-500">
           <Bot className="mt-0.5 size-4 shrink-0 text-slate-400" />
-          ИИ никогда не проводит операции сам — только классифицирует и готовит черновики для проверки бухгалтером.
+          {settings?.autoWork
+            ? "ИИ создаёт документы в 1С сам (при включённой автономности выше), но всегда НЕПРОВЕДЁННЫМИ — провести и отправить может только бухгалтер."
+            : "ИИ никогда не проводит операции сам — только классифицирует и готовит черновики для проверки бухгалтером."}
         </div>
       </Card>
     </div>
