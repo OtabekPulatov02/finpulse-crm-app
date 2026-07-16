@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { BookOpen, Bell, Bot as BotIcon, CreditCard, GitBranch, Pencil, Plus, ScrollText, Shield, Tags, Trash2, UserPlus, Users } from "lucide-react";
 import { Avatar, Badge, Card, CardHeader, Toggle, toast, type Tone } from "../components/ui";
-import { fetchBotCategories, fetchBotPositions, fetchBotSettings, fetchLogs, fetchTariffs, saveBotCategories, saveBotPositions, saveBotSettings, saveTariffs, type BotCategory, type BotSettings, type Tariff } from "../api";
+import { fetchBotCategories, fetchBotPositions, fetchBotSettings, fetchLogs, fetchNotifSettings, fetchTariffs, saveBotCategories, saveBotPositions, saveBotSettings, saveNotifSettings, saveTariffs, type BotCategory, type BotSettings, type NotifSettings, type Tariff } from "../api";
 import { mapLog, type LogView } from "../lib/logs";
 import { hydrateEmployees, useEmployees } from "../store/employees";
 import { EDITABLE_STATUSES, PRIORITIES, priorityTone, statusTone } from "../data/demo";
@@ -47,6 +47,51 @@ function DictCard({ title, items, placeholder }: { title: string; items: { label
 
 const ROLE_LABEL: Record<string, string> = { admin: "Администратор", accountant: "Бухгалтер" };
 const ROLE_TONE: Record<string, Tone> = { admin: "purple", accountant: "blue" };
+
+
+function NotifTab() {
+  const [set, setSet] = useState<NotifSettings | null>(null);
+  const [saving, setSaving] = useState(false);
+  useEffect(() => {
+    fetchNotifSettings().then(setSet).catch(() => setSet({
+      taskAssigned: true, clientMessage: true, dueSoon: true, overdue: true, weeklyDigest: false,
+    }));
+  }, []);
+  if (!set) return <Card><div className="p-8 text-center text-sm text-slate-400">Загрузка настроек уведомлений…</div></Card>;
+
+  const items: { key: keyof NotifSettings; title: string; desc: string }[] = [
+    { key: "taskAssigned", title: "Новая задача назначена мне", desc: "личное сообщение клиенту, что задача взята в работу" },
+    { key: "clientMessage", title: "Обращение клиента из Telegram", desc: "отдельный заголовок «Клиент по задаче №N» в группе (сама переписка идёт в ленту чата в любом случае)" },
+    { key: "dueSoon", title: "Приближается дедлайн", desc: "напоминание в группу и клиенту в день срока" },
+    { key: "overdue", title: "Задача просрочена", desc: "раздел «Просрочено» в ежедневном дайджесте группы" },
+    { key: "weeklyDigest", title: "Еженедельная сводка", desc: "по понедельникам — счётчики задач по статусам и просрочки" },
+  ];
+
+  const toggle = async (key: keyof NotifSettings) => {
+    const next = { ...set, [key]: !set[key] };
+    setSet(next);
+    setSaving(true);
+    try {
+      const r = await saveNotifSettings(next);
+      if (!r.ok) { toast(r.error || "Не удалось сохранить"); setSet(set); }
+    } catch { toast("Не удалось сохранить"); setSet(set); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <Card className="divide-y divide-slate-100">
+      {items.map((i) => (
+        <div key={i.key} className="flex items-center justify-between gap-4 px-5 py-4">
+          <div>
+            <div className="text-[13.5px] font-medium">{i.title}</div>
+            <div className="text-xs text-slate-400">{i.desc}</div>
+          </div>
+          <Toggle checked={set[i.key]} onChange={() => !saving && toggle(i.key)} />
+        </div>
+      ))}
+    </Card>
+  );
+}
 
 
 function TariffsTab() {
@@ -380,25 +425,7 @@ export default function Settings() {
         </Card>
       )}
 
-      {tab === "notif" && (
-        <Card className="divide-y divide-slate-100">
-          {[
-            ["Новая задача назначена мне", "в системе и в Telegram", true],
-            ["Обращение клиента из Telegram", "ответственному бухгалтеру", true],
-            ["Приближается дедлайн", "за 24 часа до срока", true],
-            ["Задача просрочена", "исполнителю и руководителю", true],
-            ["Еженедельная сводка", "по понедельникам в 09:00", false],
-          ].map(([title, desc, on]) => (
-            <div key={title as string} className="flex items-center justify-between gap-4 px-5 py-4">
-              <div>
-                <div className="text-[13.5px] font-medium">{title as string}</div>
-                <div className="text-xs text-slate-400">{desc as string}</div>
-              </div>
-              <Toggle defaultChecked={on as boolean} />
-            </div>
-          ))}
-        </Card>
-      )}
+      {tab === "notif" && <NotifTab />}
 
       {tab === "tariffs" && <TariffsTab />}
 

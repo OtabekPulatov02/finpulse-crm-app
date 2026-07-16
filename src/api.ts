@@ -504,6 +504,16 @@ export const fetchBotSettings = () =>
 export const saveBotSettings = (settings: BotSettings) =>
   post<{ ok: boolean; error?: string }>({ action: "bot_settings_save", settings });
 
+export interface NotifSettings {
+  taskAssigned: boolean; clientMessage: boolean; dueSoon: boolean; overdue: boolean; weeklyDigest: boolean;
+}
+
+export const fetchNotifSettings = () =>
+  get<{ ok: boolean; settings: NotifSettings }>("r=notif_settings").then((d) => d.settings);
+
+export const saveNotifSettings = (settings: NotifSettings) =>
+  post<{ ok: boolean; error?: string }>({ action: "notif_settings_save", settings });
+
 export const fetchBotCategories = () =>
   get<{ ok: boolean; categories: BotCategory[] | null }>("r=bot_categories").then((d) => d.categories);
 
