@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Activity, ArrowLeftRight, CheckCircle2, CloudOff, Database, RefreshCw, RefreshCwOff } from "lucide-react";
 import { Badge, Card, CardHeader, toast } from "../components/ui";
-import { fetch1cPing, sync1cCounterparties, sync1cOrgs, type App1C } from "../api";
+import { fetch1cPing, sync1cCounterparties, sync1cNomenclature, sync1cOrgs, type App1C } from "../api";
 
 /* Маппинг реквизитов 1С («Организации», БУ УЗ 3.0) → поля карточки клиента CRM */
 const FIELD_MAP: [string, string][] = [
@@ -49,6 +49,15 @@ export default function Integration1C() {
     try {
       const r = await sync1cCounterparties(a.code);
       if (r.ok) toast(`«${a.name}»: контрагентов сопоставлено ${r.mapped ?? 0} из ${r.total ?? 0}`);
+      else toast(r.error || "Синхронизация не удалась");
+    } finally { setSyncing(null); }
+  };
+
+  const doSyncNom = async (a: App1C) => {
+    setSyncing(a.code);
+    try {
+      const r = await sync1cNomenclature(a.code);
+      if (r.ok) toast(`«${a.name}»: номенклатуры сопоставлено ${r.mapped ?? 0} из ${r.total ?? 0}`);
       else toast(r.error || "Синхронизация не удалась");
     } finally { setSyncing(null); }
   };
@@ -135,7 +144,7 @@ export default function Integration1C() {
                   </td>
                   <td className="px-4 py-3 text-slate-500">{a.entities ?? "—"}</td>
                   <td className="px-4 py-3 text-right">
-                    <div className="flex justify-end gap-1.5">
+                    <div className="flex flex-wrap justify-end gap-1.5">
                       <button
                         onClick={() => doSync(a)}
                         disabled={!a.ready || syncing === a.code}
@@ -147,6 +156,12 @@ export default function Integration1C() {
                         disabled={!a.ready || syncing === a.code}
                         className="rounded-lg border border-slate-200 px-3 py-1.5 text-[12.5px] font-medium hover:bg-slate-50 disabled:opacity-40">
                         {syncing === a.code ? "…" : "Синк контрагентов"}
+                      </button>
+                      <button
+                        onClick={() => doSyncNom(a)}
+                        disabled={!a.ready || syncing === a.code}
+                        className="rounded-lg border border-slate-200 px-3 py-1.5 text-[12.5px] font-medium hover:bg-slate-50 disabled:opacity-40">
+                        {syncing === a.code ? "…" : "Синк номенклатуры"}
                       </button>
                     </div>
                   </td>
