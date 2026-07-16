@@ -453,11 +453,14 @@ async function aiGet<T>(params: string): Promise<T> {
   return r.json();
 }
 async function aiPost<T>(body: Record<string, unknown>): Promise<T> {
+  /* agent-запросы (многошаговый ИИ-агент) могут занимать до ~60с на сервере (см. vercel.json maxDuration) —
+     таймаут клиента должен быть больше, иначе валидные ответы обрываются раньше времени. */
+  const timeoutMs = body?.action === "agent" ? 65000 : 30000;
   const r = await fetch(API_AI, {
     method: "POST",
     headers: { "content-type": "application/json", ...authHeaders() },
     body: JSON.stringify(body),
-    signal: AbortSignal.timeout(30000),
+    signal: AbortSignal.timeout(timeoutMs),
   });
   return r.json();
 }
