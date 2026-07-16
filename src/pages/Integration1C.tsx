@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Activity, ArrowLeftRight, CheckCircle2, CloudOff, Database, RefreshCw, RefreshCwOff } from "lucide-react";
 import { Badge, Card, CardHeader, toast } from "../components/ui";
-import { fetch1cPing, sync1cContracts, sync1cCounterparties, sync1cNomenclature, sync1cOrgs, type App1C } from "../api";
+import { fetch1cDoclog, fetch1cPing, sync1cContracts, sync1cCounterparties, sync1cNomenclature, sync1cOrgs, type App1C, type Doc1cLogItem } from "../api";
 
 /* Маппинг реквизитов 1С («Организации», БУ УЗ 3.0) → поля карточки клиента CRM */
 const FIELD_MAP: [string, string][] = [
@@ -25,6 +25,7 @@ export default function Integration1C() {
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState<string | null>(null);
   const [syncingAll, setSyncingAll] = useState(false);
+  const [doclog, setDoclog] = useState<Doc1cLogItem[] | null>(null);
 
   const load = () => {
     setLoading(true);
@@ -34,6 +35,9 @@ export default function Integration1C() {
       .finally(() => setLoading(false));
   };
   useEffect(load, []);
+  useEffect(() => {
+    fetch1cDoclog(30).then((r) => { if (r.ok) setDoclog(r.items ?? []); }).catch(() => {});
+  }, []);
 
   const doSync = async (a: App1C) => {
     setSyncing(a.code);
@@ -174,6 +178,42 @@ export default function Integration1C() {
           </table>
           {!apps && !err && <div className="p-8 text-center text-sm text-slate-400">Проверяем доступность баз…</div>}
         </div>
+      </Card>
+
+      <Card>
+        <CardHeader title="Документы, созданные ИИ в 1С" action={<Database className="size-4 text-slate-400" />} />
+        {doclog && doclog.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-[13px]">
+              <thead>
+                <tr className="border-b border-slate-100 text-[11px] uppercase tracking-wide text-slate-400">
+                  <th className="px-4 py-2 font-medium">Задача</th>
+                  <th className="px-4 py-2 font-medium">Компания</th>
+                  <th className="px-4 py-2 font-medium">Тип</th>
+                  <th className="px-4 py-2 font-medium">Контрагент</th>
+                  <th className="px-4 py-2 font-medium">Сумма</th>
+                  <th className="px-4 py-2 font-medium">№ документа</th>
+                  <th className="px-4 py-2 font-medium">Когда</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {doclog.map((d) => (
+                  <tr key={d.ref} className="hover:bg-slate-50">
+                    <td className="px-4 py-2 text-slate-500">№{d.num}</td>
+                    <td className="px-4 py-2 font-medium">{d.company}</td>
+                    <td className="px-4 py-2 text-slate-500">{d.type}</td>
+                    <td className="px-4 py-2 text-slate-500">{d.counterparty || "—"}</td>
+                    <td className="px-4 py-2 text-slate-500">{d.amount ? d.amount.toLocaleString("ru-RU") : "—"}</td>
+                    <td className="px-4 py-2 text-slate-500">{d.number || d.ref.slice(0, 8)}</td>
+                    <td className="px-4 py-2 text-slate-400">{new Date(d.at).toLocaleString("ru-RU")}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="p-8 text-center text-sm text-slate-400">Пока нет документов, созданных ИИ</div>
+        )}
       </Card>
 
       <div className="grid grid-cols-2 gap-4 max-lg:grid-cols-1">

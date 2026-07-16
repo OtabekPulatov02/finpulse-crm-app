@@ -447,6 +447,14 @@ export const sync1cContracts = async (app: string) => {
   return r.json() as Promise<{ ok: boolean; total?: number; owners?: number; defaults?: number; error?: string }>;
 };
 
+export interface Doc1cLogItem {
+  num: number; entity: string; ref: string; number: string | null; app: string; appName: string | null;
+  company: string; type: string; amount: number | null; counterparty: string | null; at: string; by: string;
+}
+
+export const fetch1cDoclog = (limit = 50) =>
+  get1c<{ ok: boolean; items?: Doc1cLogItem[]; error?: string }>(`r=doclog&limit=${limit}`);
+
 /* ---------------- Настройки бота и категории услуг ---------------- */
 export interface BotSettings { slaHours: number; workStart: number; workEnd: number; tzOffset: number }
 export interface BotCategory { id: string; name: string; subs: string[] }
