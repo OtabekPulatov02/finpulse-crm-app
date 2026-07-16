@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Activity, ArrowLeftRight, CheckCircle2, CloudOff, Database, RefreshCw, RefreshCwOff } from "lucide-react";
 import { Badge, Card, CardHeader, toast } from "../components/ui";
-import { fetch1cDoclog, fetch1cPing, fetch1cReports, sync1cContracts, sync1cCounterparties, sync1cNomenclature, sync1cOrgs, sync1cReports, type App1C, type Doc1cLogItem, type Report1cItem } from "../api";
+import { fetch1cDoclog, fetch1cPing, fetch1cReports, sync1cContracts, sync1cCounterparties, sync1cEmployees, sync1cNomenclature, sync1cOrgs, sync1cPositions, sync1cReports, type App1C, type Doc1cLogItem, type Report1cItem } from "../api";
 
 /* Маппинг реквизитов 1С («Организации», БУ УЗ 3.0) → поля карточки клиента CRM */
 const FIELD_MAP: [string, string][] = [
@@ -92,13 +92,21 @@ export default function Integration1C() {
     try {
       for (const a of targets) {
         setSyncing(a.code);
+        let baseFailed = false;
         try {
           const r = await sync1cOrgs(a.code);
-          if (r.ok) { ok++; created += r.created ?? 0; updated += r.updated ?? 0; }
-          else failed++;
-        } catch { failed++; }
+          if (r.ok) { created += r.created ?? 0; updated += r.updated ?? 0; } else baseFailed = true;
+        } catch { baseFailed = true; }
+        // Остальные сущности синкаем "по возможности" — сбой одной не должен
+        // останавливать синк остальных для этой же базы.
+        try { await sync1cCounterparties(a.code); } catch { /* noop */ }
+        try { await sync1cContracts(a.code); } catch { /* noop */ }
+        try { await sync1cNomenclature(a.code); } catch { /* noop */ }
+        try { await sync1cEmployees(a.code); } catch { /* noop */ }
+        try { await sync1cPositions(a.code); } catch { /* noop */ }
+        if (baseFailed) failed++; else ok++;
       }
-      toast(`Синк всех баз: ${ok} успешно${failed ? `, ${failed} с ошибкой` : ""} · новых карточек ${created}, обновлено ${updated}`);
+      toast(`Синк всех баз (организации, контрагенты, номенклатура, сотрудники, должности): ${ok} успешно${failed ? `, ${failed} с ошибкой` : ""} · новых карточек ${created}, обновлено ${updated}`);
     } finally { setSyncing(null); setSyncingAll(false); }
   };
 
@@ -131,7 +139,7 @@ export default function Integration1C() {
             <button onClick={doSyncAll} disabled={!readyCount || syncingAll || !!syncing}
               className="flex items-center gap-1.5 rounded-lg border border-brand-200 bg-brand-50 px-3 py-1.5 text-[12.5px] font-medium text-brand-700 hover:bg-brand-100 disabled:opacity-40">
               {syncingAll ? <RefreshCwOff className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
-              {syncingAll ? "Синхронизация всех…" : "Синк всех организаций"}
+              {syncingAll ? "Синхронизация всех…" : "Синк всего из 1С"}
             </button>
             <button onClick={load} disabled={loading}
               className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-[12.5px] font-medium hover:bg-slate-50 disabled:opacity-50">
