@@ -8,6 +8,40 @@ import {
 
 interface ChatItem { role: "user" | "assistant"; content: string; steps?: AgentStep[] }
 
+function renderInline(text: string, keyPrefix: string) {
+  const parts: (string | JSX.Element)[] = [];
+  const regex = /\*\*(.+?)\*\*|`(.+?)`/g;
+  let last = 0, m: RegExpExecArray | null, k = 0;
+  while ((m = regex.exec(text))) {
+    if (m.index > last) parts.push(text.slice(last, m.index));
+    if (m[1] !== undefined) parts.push(<strong key={`${keyPrefix}-b${k++}`}>{m[1]}</strong>);
+    else if (m[2] !== undefined) parts.push(<code key={`${keyPrefix}-c${k++}`} className="rounded bg-black/10 px-1 py-0.5 font-mono text-[12px]">{m[2]}</code>);
+    last = regex.lastIndex;
+  }
+  if (last < text.length) parts.push(text.slice(last));
+  return parts;
+}
+
+function MessageContent({ text }: { text: string }) {
+  const lines = text.split("\n");
+  return (
+    <>
+      {lines.map((line, i) => {
+        const trimmed = line.trimStart();
+        const isBullet = /^[-*]\s+/.test(trimmed);
+        const content = isBullet ? trimmed.replace(/^[-*]\s+/, "") : line;
+        return (
+          <span key={i} className={isBullet ? "flex gap-1.5" : undefined}>
+            {isBullet && <span className="select-none">•</span>}
+            <span>{renderInline(content, String(i))}</span>
+            {i < lines.length - 1 && <br />}
+          </span>
+        );
+      })}
+    </>
+  );
+}
+
 const SUGGESTIONS = [
   "Сколько активных задач и у кого больше всего просрочек?",
   "Покажи клиентов, превысивших лимит операций",
@@ -140,7 +174,7 @@ export default function AiChat() {
                     )}
                     <div className={`rounded-2xl px-4 py-2.5 text-[13.5px] leading-relaxed whitespace-pre-wrap ${
                       m.role === "user" ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-800"}`}>
-                      {m.content}
+                      <MessageContent text={m.content} />
                     </div>
                   </div>
                 </div>
