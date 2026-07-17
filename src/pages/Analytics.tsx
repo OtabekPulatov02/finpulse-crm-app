@@ -1,6 +1,7 @@
-import { useEffect, useMemo } from "react";
-import { AlertCircle, Building2, CheckCircle2, Download, FilePlus2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { AlertCircle, Building2, CheckCircle2, Download, FilePlus2, Star } from "lucide-react";
 import { Avatar, Badge, Card, CardHeader, toast } from "../components/ui";
+import { fetchNpsStats, type NpsMonth } from "../api";
 import { useClients } from "../store/clients";
 import { hydrateEmployees, useEmployees } from "../store/employees";
 import { displayStatus, isOverdue, useTasks } from "../store/tasks";
@@ -11,6 +12,8 @@ const statusColor: Record<string, string> = {
 
 export default function Analytics() {
   useEffect(() => { void hydrateEmployees(); }, []);
+  const [nps, setNps] = useState<NpsMonth[]>([]);
+  useEffect(() => { fetchNpsStats().then(setNps).catch(() => {}); }, []);
   const clients = useClients();
   const tasks = useTasks();
   const employees = useEmployees();
@@ -118,6 +121,32 @@ export default function Analytics() {
           </div>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader title="Удовлетворённость клиентов (NPS)" />
+        {nps.some((m) => m.count > 0) ? (
+          <div className="grid grid-cols-6 gap-3 p-5 max-sm:grid-cols-2">
+            {[...nps].reverse().map((m) => (
+              <div key={m.month} className="rounded-xl border border-slate-200 bg-white p-3.5 text-center">
+                <div className="text-[11px] font-medium text-slate-400">{m.month}</div>
+                <div className="mt-1 flex items-center justify-center gap-1 text-lg font-bold">
+                  {m.avg !== null ? (
+                    <>
+                      <Star className="size-4 fill-amber-400 text-amber-400" />
+                      {m.avg}
+                    </>
+                  ) : "—"}
+                </div>
+                <div className="text-[11px] text-slate-400">{m.count} оценок</div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="px-5 py-8 text-center text-sm text-slate-400">
+            Оценок пока нет — клиенты получают запрос на оценку 1–5 в Telegram-боте после закрытия задачи.
+          </p>
+        )}
+      </Card>
     </div>
   );
 }

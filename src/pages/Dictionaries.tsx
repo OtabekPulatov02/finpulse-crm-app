@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { BookOpen, Building2, CalendarDays, Database, ExternalLink, ListTodo, Plus, Trash2 } from "lucide-react";
+import { BookOpen, Building2, CalendarDays, Database, ExternalLink, ListTodo, Plus, Sparkles, Trash2 } from "lucide-react";
 import { Badge, Card, CardHeader, toast } from "../components/ui";
 import {
-  fetchBotCategories, fetchBotPositions, fetchDicts, fetchTariffs, fetch1cDeptSummary,
+  addRagDoc, deleteRagDoc, fetchBotCategories, fetchBotPositions, fetchDicts, fetchRagDocs, fetchTariffs, fetch1cDeptSummary,
   saveBotCategories, saveBotPositions, saveDicts, saveTariffs,
-  type BotCategory, type Dicts, type Tariff, type DeptSummaryRow,
+  type BotCategory, type Dicts, type RagDoc, type Tariff, type DeptSummaryRow,
 } from "../api";
 import { EDITABLE_STATUSES, PRIORITIES, priorityTone, statusTone } from "../data/demo";
 
@@ -23,6 +23,7 @@ const CATS = [
   { id: "clients", label: "Клиенты", icon: Building2 },
   { id: "calendar", label: "Календарь", icon: CalendarDays },
   { id: "onec", label: "1С", icon: Database },
+  { id: "ai", label: "База знаний", icon: Sparkles },
 ] as const;
 type CatId = (typeof CATS)[number]["id"];
 
@@ -387,6 +388,86 @@ function OneCDicts() {
   );
 }
 
+function KnowledgeBaseDicts() {
+  const [docs, setDocs] = useState<RagDoc[] | null>(null);
+  const [title, setTitle] = useState("");
+  const [content, setContent] = useState("");
+  const [tagsInput, setTagsInput] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const load = () => fetchRagDocs().then(setDocs).catch(() => setDocs([]));
+  useEffect(() => { load(); }, []);
+
+  const add = async () => {
+    if (!title.trim() || !content.trim()) { toast("Заполните заголовок и текст ответа"); return; }
+    setSaving(true);
+    try {
+      const tags = tagsInput.split(",").map((t) => t.trim()).filter(Boolean);
+      const r = await addRagDoc({ title: title.trim(), content: content.trim(), tags });
+      if (r.ok) {
+        toast("Добавлено в базу знаний");
+        setTitle(""); setContent(""); setTagsInput("");
+        load();
+      } else {
+        toast(r.error || "Не удалось добавить");
+      }
+    } finally { setSaving(false); }
+  };
+
+  const remove = async (id: string) => {
+    await deleteRagDoc(id);
+    toast("Удалено");
+    load();
+  };
+
+  const inputClass = "w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm transition focus:border-brand-500 focus:bg-white focus:ring-2 focus:ring-brand-100 focus:outline-none";
+
+  return (
+    <Card>
+      <CardHeader title="База знаний" />
+      <div className="space-y-3 border-b border-slate-100 p-5">
+        <p className="text-xs text-slate-400">
+          Проверенные бухгалтерами ответы и регламенты — ИИ ищет здесь ПЕРЕД тем, как отвечать своими словами на вопросы по учёту/налогам УЗ, и явно цитирует найденное вместо общих рассуждений.
+        </p>
+        <input placeholder="Заголовок вопроса/темы (напр. «Как оформить возврат НДС для экспортёров»)" value={title}
+          onChange={(e) => setTitle(e.target.value)} className={inputClass} />
+        <textarea placeholder="Проверенный ответ / регламент" value={content} rows={4}
+          onChange={(e) => setContent(e.target.value)} className={inputClass} />
+        <input placeholder="Теги через запятую (необязательно)" value={tagsInput}
+          onChange={(e) => setTagsInput(e.target.value)} className={inputClass} />
+        <button onClick={add} disabled={saving}
+          className="flex items-center gap-1.5 rounded-lg bg-brand-600 px-3.5 py-2 text-[13px] font-medium text-white hover:bg-brand-700 disabled:opacity-60">
+          <Plus className="size-3.5" /> {saving ? "Добавляем…" : "Добавить в базу знаний"}
+        </button>
+      </div>
+      {docs === null ? (
+        <p className="px-5 py-8 text-center text-sm text-slate-400">Загружаем…</p>
+      ) : docs.length ? (
+        <div className="divide-y divide-slate-100">
+          {docs.map((d) => (
+            <div key={d.id} className="flex items-start justify-between gap-3 px-5 py-3.5">
+              <div className="min-w-0">
+                <div className="text-[13.5px] font-medium text-slate-700">{d.title}</div>
+                <div className="mt-0.5 line-clamp-2 text-xs text-slate-500">{d.content}</div>
+                {d.tags.length > 0 && (
+                  <div className="mt-1.5 flex flex-wrap gap-1">
+                    {d.tags.map((t) => <Badge key={t} tone="gray">{t}</Badge>)}
+                  </div>
+                )}
+              </div>
+              <button onClick={() => remove(d.id)} className="shrink-0 rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600">
+                <Trash2 className="size-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="px-5 py-8 text-center text-sm text-slate-400">База знаний пока пуста — добавьте первый проверенный ответ.</p>
+      )}
+    </Card>
+  );
+}
+
 export default function Dictionaries() {
   const [cat, setCat] = useState<CatId>("tasks");
   return (
@@ -409,6 +490,7 @@ export default function Dictionaries() {
       {cat === "clients" && <ClientsDicts />}
       {cat === "calendar" && <CalendarDicts />}
       {cat === "onec" && <OneCDicts />}
+      {cat === "ai" && <KnowledgeBaseDicts />}
     </div>
   );
 }

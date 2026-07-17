@@ -5,7 +5,8 @@ import {
 import { Badge, toast, type Tone } from "../components/ui";
 import { formatPhone } from "../lib/phone";
 import {
-  changePasswordRequest, fetchBotTasks, fetchClients, type BotTask, type CrmClient,
+  changePasswordRequest, fetchBotTasks, fetchClientBalance, fetchClients,
+  type BotTask, type ClientBalanceResult, type CrmClient,
 } from "../api";
 import { useSession } from "../auth";
 
@@ -19,6 +20,7 @@ const STATUS_TONE: Record<string, Tone> = {
 const TABS = [
   { id: "company", label: "Компания" },
   { id: "stats", label: "Статистика" },
+  { id: "finance", label: "Финансы" },
   { id: "password", label: "Пароль" },
 ] as const;
 type TabId = (typeof TABS)[number]["id"];
@@ -86,6 +88,50 @@ function StatsTab({ tasks }: { tasks: BotTask[] | null }) {
   );
 }
 
+function money(n: number | null | undefined) {
+  if (n === null || n === undefined) return "—";
+  return new Intl.NumberFormat("ru-RU").format(Math.round(n)) + " UZS";
+}
+
+function FinanceTab({ balance, loading }: { balance: ClientBalanceResult | null; loading: boolean }) {
+  if (loading) return <p className="py-8 text-center text-sm text-slate-400">Загружаем данные из 1С…</p>;
+  if (!balance || balance.demo) {
+    return <p className="py-8 text-center text-sm text-slate-400">Демо-доступ — финансовые данные скрыты.</p>;
+  }
+  if (!balance.ok) {
+    return <p className="py-8 text-center text-sm text-slate-400">{balance.error || "Не удалось загрузить данные из 1С."}</p>;
+  }
+  const r = balance.receivables;
+  const cash = balance.cash;
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex items-center gap-2 text-xs font-medium text-slate-500"><Banknote className="size-3.5" /> Оценка остатка средств</div>
+          <div className="mt-1.5 text-2xl font-bold tracking-tight">
+            {cash?.ok ? money(cash.estimate) : "—"}
+          </div>
+          <div className="mt-1 text-[11px] text-slate-400">
+            {cash?.ok ? cash.note : (cash?.error || "Недоступно")}
+          </div>
+        </div>
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex items-center gap-2 text-xs font-medium text-slate-500"><Hash className="size-3.5" /> Выставлено счетов/реализаций</div>
+          <div className="mt-1.5 text-2xl font-bold tracking-tight">
+            {r?.ok ? money((r.invoicedTotal ?? 0) + (r.shippedTotal ?? 0)) : "—"}
+          </div>
+          <div className="mt-1 text-[11px] text-slate-400">
+            {r?.ok ? `${r.invoicesCount} счетов, ${r.shipmentsCount} реализаций` : (r?.error || "Недоступно")}
+          </div>
+        </div>
+      </div>
+      <p className="text-xs text-slate-400">
+        {r?.ok ? r.note : ""}
+      </p>
+    </div>
+  );
+}
+
 function PasswordTab() {
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
@@ -135,6 +181,8 @@ export default function ClientProfile() {
   const [client, setClient] = useState<CrmClient | null>(null);
   const [tasks, setTasks] = useState<BotTask[] | null>(null);
   const [tab, setTab] = useState<TabId>("company");
+  const [balance, setBalance] = useState<ClientBalanceResult | null>(null);
+  const [balanceLoading, setBalanceLoading] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -142,6 +190,14 @@ export default function ClientProfile() {
     fetchBotTasks().then((t) => { if (alive) setTasks(t); }).catch(() => {});
     return () => { alive = false; };
   }, []);
+
+  useEffect(() => {
+    if (tab !== "finance" || balance || balanceLoading) return;
+    let alive = true;
+    setBalanceLoading(true);
+    fetchClientBalance().then((b) => { if (alive) setBalance(b); }).finally(() => { if (alive) setBalanceLoading(false); });
+    return () => { alive = false; };
+  }, [tab, balance, balanceLoading]);
 
   return (
     <div className="space-y-5">
@@ -165,6 +221,7 @@ export default function ClientProfile() {
       <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         {tab === "company" && <CompanyTab client={client} />}
         {tab === "stats" && <StatsTab tasks={tasks} />}
+        {tab === "finance" && <FinanceTab balance={balance} loading={balanceLoading} />}
         {tab === "password" && <PasswordTab />}
       </div>
     </div>

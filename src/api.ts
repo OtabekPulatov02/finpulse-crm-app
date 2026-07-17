@@ -167,6 +167,10 @@ export interface AccessRequest {
   resolvedBy?: string;
 }
 
+export interface NpsMonth { month: string; count: number; avg: number | null }
+export const fetchNpsStats = () =>
+  get<{ ok: boolean; months: NpsMonth[] }>("r=nps_stats").then((d) => d.months ?? []);
+
 export const fetchAccessRequests = () =>
   get<{ ok: boolean; requests: AccessRequest[] }>("r=access_requests").then((d) => d.requests ?? []);
 
@@ -177,6 +181,19 @@ export const resolveAccessRequest = (id: string, approve: boolean) =>
 
 export const fetchClients = () =>
   get<{ ok: boolean; clients: CrmClient[] }>("r=clients").then((d) => d.clients ?? []);
+
+export interface ClientBalanceReceivables {
+  ok: boolean; invoicedTotal: number | null; shippedTotal: number | null;
+  invoicesCount: number; shipmentsCount: number; note: string; error?: string;
+}
+export interface ClientBalanceCash { ok: boolean; estimate?: number; note?: string; error?: string }
+export interface ClientBalanceResult {
+  ok: boolean; company?: string; receivables: ClientBalanceReceivables | null; cash: ClientBalanceCash | null;
+  demo?: boolean; error?: string;
+}
+
+export const fetchClientBalance = (company?: string) =>
+  get<ClientBalanceResult>("r=client_balance" + (company ? "&company=" + encodeURIComponent(company) : ""));
 
 export interface ClientResult { ok: boolean; id?: string; merged?: boolean; client?: CrmClient; error?: string }
 
@@ -625,6 +642,14 @@ export const fetchBotPositions = () =>
 
 export const saveBotPositions = (positions: string[]) =>
   post<{ ok: boolean; error?: string }>({ action: "bot_positions_save", positions });
+
+export interface RagDoc { id: string; title: string; content: string; tags: string[]; createdAt: string; by: string }
+export const fetchRagDocs = () =>
+  aiGet<{ ok: boolean; docs: RagDoc[] }>("r=rag_list").then((d) => d.docs ?? []);
+export const addRagDoc = (data: { title: string; content: string; tags?: string[] }) =>
+  aiPost<{ ok: boolean; doc?: RagDoc; error?: string }>({ action: "rag_add", ...data });
+export const deleteRagDoc = (id: string) =>
+  aiPost<{ ok: boolean; error?: string }>({ action: "rag_delete", id });
 
 export interface AgentMessage { role: "user" | "assistant"; content: string }
 export interface AgentStep { tool: string; args: string; ok: boolean }
