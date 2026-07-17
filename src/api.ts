@@ -1,7 +1,9 @@
-/* Клиент API-моста: тот же бэкенд, что у Telegram-бота (finpulse-crm.vercel.app) */
+/* Клиент API-моста: тот же бэкенд, что у Telegram-бота (finpulse-crm.vercel.app).
+   Настраивается через VITE_API_ORIGIN (например, для стейджинг-фронта, который
+   должен ходить в стейджинг-бэкенд, а не в прод) — по умолчанию прод. */
 import { getToken, clearSession } from "./auth";
 
-const ORIGIN = "https://finpulse-crm.vercel.app";
+const ORIGIN = import.meta.env.VITE_API_ORIGIN || "https://finpulse-crm.vercel.app";
 const API = `${ORIGIN}/api/crm`;
 const AUTH_API = `${ORIGIN}/api/auth`;
 /* Временный общий ключ (до полноценных JWT-сессий из ролевой системы).
