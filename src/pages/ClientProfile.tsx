@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Banknote, Building2, CheckCircle2, Clock3, Hash, KeyRound, ListTodo, MapPin, Phone, ShieldCheck,
 } from "lucide-react";
@@ -191,13 +191,17 @@ export default function ClientProfile() {
     return () => { alive = false; };
   }, []);
 
+  const balanceLoadingRef = useRef(false);
   useEffect(() => {
-    if (tab !== "finance" || balance || balanceLoading) return;
+    if (tab !== "finance" || balance || balanceLoadingRef.current) return;
     let alive = true;
+    balanceLoadingRef.current = true;
     setBalanceLoading(true);
-    fetchClientBalance().then((b) => { if (alive) setBalance(b); }).finally(() => { if (alive) setBalanceLoading(false); });
+    fetchClientBalance()
+      .then((b) => { if (alive) setBalance(b); })
+      .finally(() => { balanceLoadingRef.current = false; if (alive) setBalanceLoading(false); });
     return () => { alive = false; };
-  }, [tab, balance, balanceLoading]);
+  }, [tab, balance]);
 
   return (
     <div className="space-y-5">
