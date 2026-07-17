@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Activity, ArrowLeftRight, CheckCircle2, CloudOff, Database, RefreshCw, RefreshCwOff } from "lucide-react";
 import { Badge, Card, CardHeader, toast } from "../components/ui";
-import { fetch1cDoclog, fetch1cPing, fetch1cReports, sync1cContracts, sync1cCounterparties, sync1cEmployees, sync1cNomenclature, sync1cOrgs, sync1cPositions, sync1cReports, type App1C, type Doc1cLogItem, type Report1cItem } from "../api";
+import { cancelAiDoc1c, fetch1cDoclog, fetch1cPing, fetch1cReports, sync1cContracts, sync1cCounterparties, sync1cDepartments, sync1cEmployees, sync1cNomenclature, sync1cOrgs, sync1cPositions, sync1cReports, type App1C, type Doc1cLogItem, type Report1cItem } from "../api";
 
 /* Маппинг реквизитов 1С («Организации», БУ УЗ 3.0) → поля карточки клиента CRM */
 const FIELD_MAP: [string, string][] = [
@@ -104,6 +104,7 @@ export default function Integration1C() {
         try { await sync1cNomenclature(a.code); } catch { /* noop */ }
         try { await sync1cEmployees(a.code); } catch { /* noop */ }
         try { await sync1cPositions(a.code); } catch { /* noop */ }
+        try { await sync1cDepartments(a.code); } catch { /* noop */ }
         if (baseFailed) failed++; else ok++;
       }
       toast(`Синк всех баз (организации, контрагенты, номенклатура, сотрудники, должности): ${ok} успешно${failed ? `, ${failed} с ошибкой` : ""} · новых карточек ${created}, обновлено ${updated}`);
@@ -223,6 +224,7 @@ export default function Integration1C() {
                   <th className="px-4 py-2 font-medium">Сумма</th>
                   <th className="px-4 py-2 font-medium">№ документа</th>
                   <th className="px-4 py-2 font-medium">Когда</th>
+                  <th className="px-4 py-2 font-medium"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -235,6 +237,18 @@ export default function Integration1C() {
                     <td className="px-4 py-2 text-slate-500">{d.amount ? d.amount.toLocaleString("ru-RU") : "—"}</td>
                     <td className="px-4 py-2 text-slate-500">{d.number || d.ref.slice(0, 8)}</td>
                     <td className="px-4 py-2 text-slate-400">{new Date(d.at).toLocaleString("ru-RU")}</td>
+                    <td className="px-4 py-2 text-right">
+                      <button
+                        onClick={async () => {
+                          if (!window.confirm(`Отменить документ по задаче №${d.num} (${d.type})? Работает только пока документ не проведён в 1С.`)) return;
+                          const r = await cancelAiDoc1c(d.num);
+                          if (r.ok) { toast("Документ отменён и удалён из 1С"); setDoclog((cur) => (cur ?? []).filter((x) => x.ref !== d.ref)); }
+                          else toast(r.error || "Не удалось отменить документ");
+                        }}
+                        className="rounded-lg border border-red-200 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50">
+                        Отменить
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>

@@ -455,6 +455,16 @@ export interface Doc1cLogItem {
 export const fetch1cDoclog = (limit = 50) =>
   get1c<{ ok: boolean; items?: Doc1cLogItem[]; error?: string }>(`r=doclog&limit=${limit}`);
 
+export const cancelAiDoc1c = async (num: number) => {
+  const r = await fetch(API_1C, {
+    method: "POST",
+    headers: { "content-type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ action: "cancel_ai_doc", num }),
+    signal: AbortSignal.timeout(20000),
+  });
+  return r.json() as Promise<{ ok: boolean; error?: string }>;
+};
+
 export interface Report1cItem {
   name: string; periodicity: string; lastPeriodLabel: string; lastPeriodEnd: string;
   lastPreparedAt: string; nextExpectedPeriodEnd: string; periodsSkipped: number;
@@ -479,6 +489,16 @@ export const sync1cPositions = async (app: string) => {
     method: "POST",
     headers: { "content-type": "application/json", ...authHeaders() },
     body: JSON.stringify({ action: "sync_positions", app }),
+    signal: AbortSignal.timeout(30000),
+  });
+  return r.json() as Promise<{ ok: boolean; total?: number; mapped?: number; error?: string }>;
+};
+
+export const sync1cDepartments = async (app: string) => {
+  const r = await fetch(API_1C, {
+    method: "POST",
+    headers: { "content-type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ action: "sync_departments", app }),
     signal: AbortSignal.timeout(30000),
   });
   return r.json() as Promise<{ ok: boolean; total?: number; mapped?: number; error?: string }>;
