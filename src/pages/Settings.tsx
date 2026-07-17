@@ -1,49 +1,21 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { BookOpen, Bell, Bot as BotIcon, CreditCard, GitBranch, Pencil, Plus, ScrollText, Shield, Tags, Trash2, UserPlus, Users } from "lucide-react";
+import { Bell, Bot as BotIcon, GitBranch, Link2, ScrollText, Shield, UserPlus, Users } from "lucide-react";
 import { Avatar, Badge, Card, CardHeader, Toggle, toast, type Tone } from "../components/ui";
-import { fetchBotCategories, fetchBotPositions, fetchBotSettings, fetchLogs, fetchNotifSettings, fetchTariffs, saveBotCategories, saveBotPositions, saveBotSettings, saveNotifSettings, saveTariffs, type BotCategory, type BotSettings, type NotifSettings, type Tariff } from "../api";
+import { fetchBotSettings, fetchLogs, fetchNotifSettings, saveBotSettings, saveNotifSettings, type BotSettings, type NotifSettings } from "../api";
 import { mapLog, type LogView } from "../lib/logs";
 import { hydrateEmployees, useEmployees } from "../store/employees";
-import { EDITABLE_STATUSES, PRIORITIES, priorityTone, statusTone } from "../data/demo";
 import { formatPhone } from "../lib/phone";
 
 const tabs = [
   { id: "users", label: "Пользователи", icon: Users },
   { id: "roles", label: "Роли", icon: Shield },
-  { id: "statuses", label: "Статусы", icon: Tags },
-  { id: "dicts", label: "Справочники", icon: BookOpen },
   { id: "rules", label: "Распределение", icon: GitBranch },
-  { id: "tariffs", label: "Тарифы", icon: CreditCard },
   { id: "bot", label: "Бот", icon: BotIcon },
   { id: "notif", label: "Уведомления", icon: Bell },
   { id: "logs", label: "Логи системы", icon: ScrollText },
 ] as const;
 type TabId = (typeof tabs)[number]["id"];
-
-function DictCard({ title, items, placeholder }: { title: string; items: { label: string; badge?: Tone; note?: string }[]; placeholder: string }) {
-  return (
-    <Card>
-      <CardHeader title={title} />
-      <div className="divide-y divide-slate-100">
-        {items.map((i) => (
-          <div key={i.label} className="flex items-center justify-between gap-3 px-5 py-3">
-            <div className="flex items-center gap-3">
-              {i.badge ? <Badge tone={i.badge}>{i.label}</Badge> : <span className="text-[13.5px] font-medium">{i.label}</span>}
-              {i.note && <span className="text-xs text-slate-400">{i.note}</span>}
-            </div>
-            <button onClick={() => toast("Редактирование справочника (демо)")} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"><Pencil className="size-3.5" /></button>
-          </div>
-        ))}
-        <div className="flex items-center gap-2 px-5 py-3">
-          <input placeholder={placeholder} className="flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-[13px] focus:border-brand-500 focus:outline-none" />
-          <button onClick={() => toast("Добавлено в справочник (демо)")} className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium hover:bg-slate-50"><Plus className="size-3.5" />Добавить</button>
-        </div>
-      </div>
-    </Card>
-  );
-}
-
 
 const ROLE_LABEL: Record<string, string> = { admin: "Администратор", accountant: "Бухгалтер" };
 const ROLE_TONE: Record<string, Tone> = { admin: "purple", accountant: "blue" };
@@ -94,108 +66,20 @@ function NotifTab() {
 }
 
 
-function TariffsTab() {
-  const [rows, setRows] = useState<Tariff[] | null>(null);
-  const [saving, setSaving] = useState(false);
-  useEffect(() => { fetchTariffs().then(setRows).catch(() => setRows([])); }, []);
-  if (!rows) return <Card><div className="p-8 text-center text-sm text-slate-400">Загрузка тарифов…</div></Card>;
-
-  const upd = (i: number, k: keyof Tariff, v: string) =>
-    setRows((r) => r!.map((t, idx) => idx === i ? { ...t, [k]: k === "name" ? v : v === "" ? null : Number(v.replace(/\D/g, "")) } : t));
-
-  const save = async () => {
-    setSaving(true);
-    try {
-      const r = await saveTariffs(rows);
-      if (r.ok) toast("Тарифы сохранены — лимиты применяются со следующего пересчёта");
-      else toast(r.error || "Не удалось сохранить");
-    } finally { setSaving(false); }
-  };
-
-  const num = (v: number | null) => (v == null ? "" : String(v));
-
-  return (
-    <Card>
-      <CardHeader title="Тарифы и лимиты операций" action={
-        <button onClick={() => setRows((r) => [...r!, { id: "t" + Date.now().toString(36), name: "Новый тариф", price: 0, monthlyLimit: 30, overPackOps: 10, overPackPrice: 0 }])}
-          className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-[12.5px] font-medium hover:bg-slate-50">
-          <Plus className="size-3.5" /> Добавить тариф
-        </button>
-      } />
-      <div className="overflow-x-auto">
-        <table className="w-full text-[13px]">
-          <thead>
-            <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold tracking-wider text-slate-400 uppercase">
-              <th className="px-4 py-3">Название</th>
-              <th className="px-4 py-3">Цена, сум/мес</th>
-              <th className="px-4 py-3">Лимит операций/мес</th>
-              <th className="px-4 py-3">Пакет сверхлимита, опер.</th>
-              <th className="px-4 py-3">Цена пакета, сум</th>
-              <th className="px-4 py-3" />
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {rows.map((t, i) => (
-              <tr key={t.id}>
-                <td className="px-4 py-2"><input value={t.name} onChange={(e) => upd(i, "name", e.target.value)} className="w-36 rounded-lg border border-slate-200 px-2.5 py-1.5 focus:border-brand-500 focus:outline-none" /></td>
-                <td className="px-4 py-2"><input value={num(t.price)} onChange={(e) => upd(i, "price", e.target.value)} className="w-28 rounded-lg border border-slate-200 px-2.5 py-1.5 focus:border-brand-500 focus:outline-none" /></td>
-                <td className="px-4 py-2"><input value={num(t.monthlyLimit)} onChange={(e) => upd(i, "monthlyLimit", e.target.value)} placeholder="∞" className="w-24 rounded-lg border border-slate-200 px-2.5 py-1.5 focus:border-brand-500 focus:outline-none" /></td>
-                <td className="px-4 py-2"><input value={num(t.overPackOps)} onChange={(e) => upd(i, "overPackOps", e.target.value)} placeholder="—" className="w-24 rounded-lg border border-slate-200 px-2.5 py-1.5 focus:border-brand-500 focus:outline-none" /></td>
-                <td className="px-4 py-2"><input value={num(t.overPackPrice)} onChange={(e) => upd(i, "overPackPrice", e.target.value)} placeholder="—" className="w-28 rounded-lg border border-slate-200 px-2.5 py-1.5 focus:border-brand-500 focus:outline-none" /></td>
-                <td className="px-4 py-2 text-right">
-                  <button onClick={() => setRows((r) => r!.filter((_, idx) => idx !== i))} className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"><Trash2 className="size-4" /></button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <div className="flex items-center justify-between border-t border-slate-100 px-5 py-3.5">
-        <span className="text-[12.5px] text-slate-400">Пустой лимит = безлимит. «Операция» — выполненная задача клиента за календарный месяц. Пакеты докупаются в карточке клиента.</span>
-        <button onClick={save} disabled={saving}
-          className="rounded-lg bg-brand-600 px-4 py-2 text-[13px] font-medium text-white hover:bg-brand-700 disabled:opacity-50">
-          {saving ? "Сохранение…" : "Сохранить"}
-        </button>
-      </div>
-    </Card>
-  );
-}
-
-
-const DEFAULT_BOT_CATS: BotCategory[] = [
-  { id: "pay", name: "💸 Оплатить / платёжка", subs: ["Оплатить счёт поставщика", "Оплата налога", "Перевод между счетами", "Выплата зарплаты"] },
-  { id: "esf", name: "🧾 Счёт-фактура (ЭСФ)", subs: ["Выставить ЭСФ покупателю", "Проверить входящую ЭСФ", "Исправить / аннулировать ЭСФ"] },
-  { id: "sign", name: "✍️ Подписать документ", subs: [] },
-  { id: "akt", name: "🤝 Акт сверки", subs: ["С контрагентом", "С налоговой"] },
-  { id: "dogovor", name: "📄 Договор", subs: ["Подготовить договор", "Проверить договор контрагента"] },
-  { id: "hr", name: "👥 Кадры", subs: ["Принять сотрудника", "Уволить сотрудника", "Отпуск / больничный"] },
-  { id: "report", name: "📊 Отчёты и налоги", subs: ["Сдать отчёт", "Сколько налогов к оплате?", "Справка из налоговой"] },
-  { id: "bank", name: "🏦 Банк / выписка", subs: ["Выписка по счёту", "Открыть / закрыть счёт"] },
-  { id: "consult", name: "💬 Консультация", subs: [] },
-  { id: "other", name: "📝 Другое", subs: [] },
-];
-
 function BotTab() {
   const [set, setSet] = useState<BotSettings | null>(null);
-  const [cats, setCats] = useState<BotCategory[] | null>(null);
-  const [positions, setPositions] = useState<string[]>([]);
-  const [newPos, setNewPos] = useState("");
   const [saving, setSaving] = useState(false);
   useEffect(() => {
     fetchBotSettings().then(setSet).catch(() => setSet({ slaHours: 3, workStart: 9, workEnd: 16, tzOffset: 5 }));
-    fetchBotCategories().then((c) => setCats(c ?? DEFAULT_BOT_CATS)).catch(() => setCats(DEFAULT_BOT_CATS));
-    fetchBotPositions().then(setPositions).catch(() => {});
   }, []);
-  if (!set || !cats) return <Card><div className="p-8 text-center text-sm text-slate-400">Загрузка настроек бота…</div></Card>;
+  if (!set) return <Card><div className="p-8 text-center text-sm text-slate-400">Загрузка настроек бота…</div></Card>;
 
   const saveAll = async () => {
     setSaving(true);
     try {
       const r1 = await saveBotSettings(set);
-      const r2 = await saveBotCategories(cats);
-      const r3 = await saveBotPositions(positions);
-      if (r1.ok && r2.ok && r3.ok) toast("Настройки бота сохранены — применяются сразу");
-      else toast(r1.error || r2.error || r3.error || "Не удалось сохранить");
+      if (r1.ok) toast("Настройки бота сохранены — применяются сразу");
+      else toast(r1.error || "Не удалось сохранить");
     } finally { setSaving(false); }
   };
   const numInput = "w-20 rounded-lg border border-slate-200 px-2.5 py-1.5 text-center focus:border-brand-500 focus:outline-none";
@@ -220,61 +104,12 @@ function BotTab() {
             <p className="mt-1.5 text-xs text-slate-400">«⏱ Проведём вашу операцию в течение N ч.» после приёма заявки</p>
           </div>
           <div>
-            <div className="mb-1.5 font-medium">Должности (табы при регистрации)</div>
-            <div className="flex flex-wrap gap-1.5">
-              {positions.map((p2, i) => (
-                <span key={i} className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 py-1 pr-1.5 pl-2.5 text-[12.5px] font-medium">
-                  {p2}
-                  <button onClick={() => setPositions(positions.filter((_, xi) => xi !== i))}
-                    className="rounded-full p-0.5 text-slate-400 hover:bg-red-50 hover:text-red-600" aria-label="Удалить">
-                    <svg className="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6 6 18M6 6l12 12" /></svg>
-                  </button>
-                </span>
-              ))}
-              <span className="inline-flex items-center gap-1 rounded-full border border-dashed border-slate-300 py-1 pr-1.5 pl-2.5 text-[12.5px] text-slate-400">Другое — всегда</span>
-            </div>
-            <div className="mt-2 flex gap-1.5">
-              <input value={newPos} onChange={(e) => setNewPos(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter" && newPos.trim()) { setPositions([...positions, newPos.trim()]); setNewPos(""); } }}
-                placeholder="Новая должность"
-                className="w-44 rounded-lg border border-slate-200 px-2.5 py-1.5 text-[13px] focus:border-brand-500 focus:outline-none" />
-              <button onClick={() => { if (newPos.trim()) { setPositions([...positions, newPos.trim()]); setNewPos(""); } }}
-                disabled={!newPos.trim()}
-                className="flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-[13px] font-medium hover:bg-slate-50 disabled:opacity-40">
-                <Plus className="size-3.5" /> Добавить
-              </button>
-            </div>
-            <p className="mt-1.5 text-xs text-slate-400">Тот же список — в карточке клиента.</p>
-          </div>
-          <div>
             <div className="mb-1.5 font-medium">Доверенные лица</div>
             <p className="text-xs leading-relaxed text-slate-400">Заявки отправляет владелец номера из карточки клиента или первый зарегистрированный. Остальные — после подтверждения (Telegram или блок «Заявки на доступ» в Клиентах).</p>
           </div>
         </div>
-      </Card>
-
-      <Card>
-        <CardHeader title="Категории услуг в боте" action={
-          <button onClick={() => setCats([...cats, { id: "cat" + Date.now().toString(36), name: "Новая категория", subs: [] }])}
-            className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-[12.5px] font-medium hover:bg-slate-50">
-            <Plus className="size-3.5" /> Категория
-          </button>
-        } />
-        <div className="divide-y divide-slate-100">
-          {cats.map((c, i) => (
-            <div key={c.id} className="flex flex-wrap items-start gap-3 px-5 py-3">
-              <input value={c.name} onChange={(e) => setCats(cats.map((x, xi) => xi === i ? { ...x, name: e.target.value } : x))}
-                className="w-56 rounded-lg border border-slate-200 px-2.5 py-1.5 text-[13px] font-medium focus:border-brand-500 focus:outline-none" />
-              <input value={c.subs.join(", ")} placeholder="Подкатегории через запятую (пусто — сразу свободный текст)"
-                onChange={(e) => setCats(cats.map((x, xi) => xi === i ? { ...x, subs: e.target.value.split(",").map((v) => v.trimStart()) } : x))}
-                onBlur={(e) => setCats(cats.map((x, xi) => xi === i ? { ...x, subs: e.target.value.split(",").map((v) => v.trim()).filter(Boolean) } : x))}
-                className="min-w-64 flex-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-[13px] focus:border-brand-500 focus:outline-none" />
-              <button onClick={() => setCats(cats.filter((_, xi) => xi !== i))} className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"><Trash2 className="size-4" /></button>
-            </div>
-          ))}
-        </div>
         <div className="flex items-center justify-between border-t border-slate-100 px-5 py-3.5">
-          <span className="text-[12.5px] text-slate-400">Клиент видит категории табами при создании заявки. После включения 1С подкатегории дополнятся подсказками из ЭДО (например, «Подписать договор № 14»).</span>
+          <span className="flex items-center gap-1.5 text-[12.5px] text-slate-400"><Link2 className="size-3.5" />Категории заявок и должности клиентов — в разделе <Link to="/dictionaries" className="font-medium text-brand-600 hover:underline">«Справочники»</Link></span>
           <button onClick={saveAll} disabled={saving}
             className="rounded-lg bg-brand-600 px-4 py-2 text-[13px] font-medium text-white hover:bg-brand-700 disabled:opacity-50">
             {saving ? "Сохранение…" : "Сохранить"}
@@ -311,7 +146,7 @@ export default function Settings() {
     <div className="space-y-5">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Настройки</h1>
-        <p className="mt-0.5 text-sm text-slate-500">Пользователи, роли, справочники и логи</p>
+        <p className="mt-0.5 text-sm text-slate-500">Пользователи, роли, распределение и логи</p>
       </div>
 
       <div className="flex gap-1 overflow-x-auto border-b border-slate-200 [scrollbar-width:none]">
@@ -371,40 +206,9 @@ export default function Settings() {
         </div>
       )}
 
-      {tab === "statuses" && (
-        <div className="grid grid-cols-2 gap-4 max-lg:grid-cols-1">
-          <DictCard title="Статусы задач" placeholder="Новый статус" items={[
-            ...EDITABLE_STATUSES.map((s) => ({ label: s, badge: statusTone[s] })),
-            { label: "Архив", badge: "gray" as Tone, note: "авто, через 24ч после выполнения" },
-          ]} />
-          <DictCard title="Приоритеты" placeholder="Новый приоритет" items={
-            PRIORITIES.map((p) => ({ label: p, badge: priorityTone[p] }))
-          } />
-        </div>
-      )}
-
-      {tab === "dicts" && (
-        <div className="grid grid-cols-2 gap-4 max-lg:grid-cols-1">
-          <DictCard title="Типы событий календаря" placeholder="Новый тип" items={[
-            { label: "Налоги и отчёты", badge: "purple", note: "срок в госорганы" },
-            { label: "Платежи фирм", badge: "blue", note: "регулярные оплаты" },
-            { label: "Задачи", badge: "yellow", note: "системный" },
-          ]} />
-          <DictCard title="Категории платежей" placeholder="Новая категория" items={[
-            { label: "Аренда" }, { label: "Интернет и связь" }, { label: "Коммунальные услуги" }, { label: "Лизинг" }, { label: "Страховка" },
-          ]} />
-          <DictCard title="Интервалы напоминаний" placeholder="Например: за 2 недели" items={[
-            { label: "В день события" }, { label: "За 1 день" }, { label: "За 3 дня", note: "по умолчанию" }, { label: "За неделю" },
-          ]} />
-          <DictCard title="Периодичность повторов" placeholder="Например: каждые 2 недели" items={[
-            { label: "Однократно", note: "системный" }, { label: "Ежедневно" }, { label: "Ежемесячно", note: "по умолчанию" }, { label: "Ежеквартально" }, { label: "Ежегодно" },
-          ]} />
-        </div>
-      )}
-
       {tab === "rules" && (
         <Card>
-          <CardHeader title="Правила автораспределения" action={<button className="flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700"><Plus className="size-3.5" />Правило</button>} />
+          <CardHeader title="Правила автораспределения" action={<Badge tone="yellow">Демо — пока не влияет на реальное назначение задач</Badge>} />
           <div className="divide-y divide-slate-100">
             {[
               { n: 1, title: "Обращения из Telegram → ответственный бухгалтер", desc: "Источник: Telegram · Приоритет: Средний · Срок: 2 рабочих дня", on: true },
@@ -426,8 +230,6 @@ export default function Settings() {
       )}
 
       {tab === "notif" && <NotifTab />}
-
-      {tab === "tariffs" && <TariffsTab />}
 
       {tab === "bot" && <BotTab />}
 

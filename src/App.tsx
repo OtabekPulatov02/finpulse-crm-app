@@ -13,6 +13,7 @@ import Calendar from "./pages/Calendar";
 import Employees from "./pages/Employees";
 import Analytics from "./pages/Analytics";
 import Settings from "./pages/Settings";
+import Dictionaries from "./pages/Dictionaries";
 import Integrations from "./pages/Integrations";
 import Integration1C from "./pages/Integration1C";
 import IntegrationAI from "./pages/IntegrationAI";
@@ -42,6 +43,7 @@ export default function App() {
             <Route path="/employees" element={<Employees />} />
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/dictionaries" element={<Dictionaries />} />
             <Route path="/integrations" element={<Integrations />} />
             <Route path="/integrations/1c" element={<Integration1C />} />
             <Route path="/integrations/ai" element={<IntegrationAI />} />

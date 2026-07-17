@@ -390,6 +390,20 @@ export const fetchUsage = () =>
 export const addOpsPack = (clientId: string, packs = 1) =>
   post<{ ok: boolean; packs?: number; error?: string }>({ action: "ops_pack_add", clientId, packs });
 
+/* ---------------- Справочники (календарь) ---------------- */
+export interface Dicts {
+  calendarEventTypes: string[];
+  paymentCategories: string[];
+  reminderIntervals: string[];
+  repeatPeriods: string[];
+}
+
+export const fetchDicts = () =>
+  get<{ ok: boolean; dicts: Dicts }>("r=dicts").then((d) => d.dicts);
+
+export const saveDicts = (dicts: Dicts) =>
+  post<{ ok: boolean; dicts?: Dicts; error?: string }>({ action: "dicts_save", dicts });
+
 /* ---------------- 1С (Clobus) ---------------- */
 const API_1C = `${ORIGIN}/api/1c`;
 
@@ -503,6 +517,10 @@ export const sync1cDepartments = async (app: string) => {
   });
   return r.json() as Promise<{ ok: boolean; total?: number; mapped?: number; error?: string }>;
 };
+
+export interface DeptSummaryRow { code: string; name: string; count: number; items: string[] }
+export const fetch1cDeptSummary = () =>
+  get1c<{ ok: boolean; bases?: DeptSummaryRow[]; error?: string }>("r=dept_summary").then((d) => d.bases ?? []);
 
 export const sync1cReports = async (app: string) => {
   const r = await fetch(API_1C, {

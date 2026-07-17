@@ -1,7 +1,7 @@
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   AlertCircle, BarChart3, Bell, Building2, CalendarDays, CheckCheck, ChevronDown,
-  LayoutDashboard, ListTodo, LogOut, Menu as MenuIcon, Search, Send, Settings, User, Users, X, Database, Sparkles, BotMessageSquare,
+  LayoutDashboard, ListTodo, LogOut, Menu as MenuIcon, Search, Send, Settings, User, Users, X, Database, Sparkles, BotMessageSquare, BookOpen,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Avatar, Menu, MenuDivider, MenuItem, Toaster, toast } from "./ui";
@@ -20,6 +20,7 @@ const ALL_NAV = [
   { to: "/clients", label: "Клиенты", icon: Building2, hideFor: ["client"] as string[] },
   { to: "/employees", label: "Сотрудники", icon: Users, hideFor: ["accountant", "guest", "client"] },
   { to: "/analytics", label: "Аналитика", icon: BarChart3, hideFor: ["client"] as string[] },
+  { to: "/dictionaries", label: "Справочники", icon: BookOpen, hideFor: ["accountant", "guest", "client"] },
   { to: "/settings", label: "Настройки", icon: Settings, hideFor: ["accountant", "guest", "client"] },
   { to: "/client", label: "Мои задачи", icon: ListTodo, end: true, hideFor: ["admin", "accountant", "guest"] as string[] },
   { to: "/client/profile", label: "Профиль", icon: User, hideFor: ["admin", "accountant", "guest"] as string[] },
