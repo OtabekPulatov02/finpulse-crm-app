@@ -607,6 +607,8 @@ export interface AiSettings { classify: boolean; drafts: boolean; summarize: boo
 
 async function aiGet<T>(params: string): Promise<T> {
   const r = await fetch(`${API_AI}?${params}`, { signal: AbortSignal.timeout(20000), headers: authHeaders() });
+  if (r.status === 401) clearSession();
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
   return r.json();
 }
 async function aiPost<T>(body: Record<string, unknown>): Promise<T> {
@@ -619,6 +621,8 @@ async function aiPost<T>(body: Record<string, unknown>): Promise<T> {
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(timeoutMs),
   });
+  if (r.status === 401) clearSession();
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
   return r.json();
 }
 

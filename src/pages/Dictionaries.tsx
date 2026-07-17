@@ -411,13 +411,18 @@ function KnowledgeBaseDicts() {
       } else {
         toast(r.error || "Не удалось добавить");
       }
+    } catch {
+      toast("Не удалось добавить — проверьте соединение и попробуйте снова");
     } finally { setSaving(false); }
   };
 
   const remove = async (id: string) => {
-    await deleteRagDoc(id);
-    toast("Удалено");
-    load();
+    try {
+      const r = await deleteRagDoc(id);
+      if (r.ok) { toast("Удалено"); load(); } else { toast(r.error || "Не удалось удалить"); }
+    } catch {
+      toast("Не удалось удалить — попробуйте ещё раз");
+    }
   };
 
   const inputClass = "w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm transition focus:border-brand-500 focus:bg-white focus:ring-2 focus:ring-brand-100 focus:outline-none";

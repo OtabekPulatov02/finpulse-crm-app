@@ -93,8 +93,11 @@ function money(n: number | null | undefined) {
   return new Intl.NumberFormat("ru-RU").format(Math.round(n)) + " UZS";
 }
 
-function FinanceTab({ balance, loading }: { balance: ClientBalanceResult | null; loading: boolean }) {
+function FinanceTab({ balance, loading, error }: { balance: ClientBalanceResult | null; loading: boolean; error: string | null }) {
   if (loading) return <p className="py-8 text-center text-sm text-slate-400">Загружаем данные из 1С…</p>;
+  if (error && !balance) {
+    return <p className="py-8 text-center text-sm text-rose-500">Не удалось загрузить данные: {error}. Попробуйте обновить страницу.</p>;
+  }
   if (!balance || balance.demo) {
     return <p className="py-8 text-center text-sm text-slate-400">Демо-доступ — финансовые данные скрыты.</p>;
   }
@@ -183,6 +186,7 @@ export default function ClientProfile() {
   const [tab, setTab] = useState<TabId>("company");
   const [balance, setBalance] = useState<ClientBalanceResult | null>(null);
   const [balanceLoading, setBalanceLoading] = useState(false);
+  const [balanceError, setBalanceError] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -193,15 +197,16 @@ export default function ClientProfile() {
 
   const balanceLoadingRef = useRef(false);
   useEffect(() => {
-    if (tab !== "finance" || balance || balanceLoadingRef.current) return;
+    if (tab !== "finance" || balance || balanceError || balanceLoadingRef.current) return;
     let alive = true;
     balanceLoadingRef.current = true;
     setBalanceLoading(true);
     fetchClientBalance()
       .then((b) => { if (alive) setBalance(b); })
+      .catch((e) => { if (alive) setBalanceError(e instanceof Error ? e.message : String(e)); })
       .finally(() => { balanceLoadingRef.current = false; if (alive) setBalanceLoading(false); });
     return () => { alive = false; };
-  }, [tab, balance]);
+  }, [tab, balance, balanceError]);
 
   return (
     <div className="space-y-5">
@@ -225,7 +230,7 @@ export default function ClientProfile() {
       <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         {tab === "company" && <CompanyTab client={client} />}
         {tab === "stats" && <StatsTab tasks={tasks} />}
-        {tab === "finance" && <FinanceTab balance={balance} loading={balanceLoading} />}
+        {tab === "finance" && <FinanceTab balance={balance} loading={balanceLoading} error={balanceError} />}
         {tab === "password" && <PasswordTab />}
       </div>
     </div>

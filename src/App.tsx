@@ -1,7 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import Layout from "./components/Layout";
 import TopProgressBar from "./components/TopProgressBar";
-import { RequireAuth, RequireClientArea, RequireStaffArea } from "./components/RequireAuth";
+import { RequireAdminArea, RequireAuth, RequireClientArea, RequireStaffArea } from "./components/RequireAuth";
 import Login from "./pages/Login";
 import ClientTasks from "./pages/ClientTasks";
 import ClientProfile from "./pages/ClientProfile";
@@ -40,10 +40,12 @@ export default function App() {
             <Route path="/tasks/:id" element={<TaskDetailPage />} />
             <Route path="/calendar" element={<Calendar />} />
             <Route path="/clients" element={<Clients />} />
-            <Route path="/employees" element={<Employees />} />
             <Route path="/analytics" element={<Analytics />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="/dictionaries" element={<Dictionaries />} />
+            <Route element={<RequireAdminArea />}>
+              <Route path="/employees" element={<Employees />} />
+              <Route path="/settings" element={<Settings />} />
+              <Route path="/dictionaries" element={<Dictionaries />} />
+            </Route>
             <Route path="/integrations" element={<Integrations />} />
             <Route path="/integrations/1c" element={<Integration1C />} />
             <Route path="/integrations/ai" element={<IntegrationAI />} />
