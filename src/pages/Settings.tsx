@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Bell, Bot as BotIcon, GitBranch, Link2, ScrollText, Shield, UserPlus, Users } from "lucide-react";
+import { Bell, Bot as BotIcon, GitBranch, Link2, Plus, ScrollText, Shield, Trash2, UserPlus, Users } from "lucide-react";
 import { Avatar, Badge, Card, CardHeader, Toggle, toast, type Tone } from "../components/ui";
-import { fetchBotSettings, fetchLogs, fetchNotifSettings, saveBotSettings, saveNotifSettings, type BotSettings, type NotifSettings } from "../api";
+import { fetchAssignRules, fetchBotSettings, fetchLogs, fetchLogsArchive, fetchNotifSettings, saveAssignRules, saveBotSettings, saveNotifSettings, type AssignRule, type BotSettings, type NotifSettings } from "../api";
 import { mapLog, type LogView } from "../lib/logs";
 import { hydrateEmployees, useEmployees } from "../store/employees";
 import { formatPhone } from "../lib/phone";
@@ -120,17 +120,113 @@ function BotTab() {
   );
 }
 
+const PRIORITY_OPTIONS = ["Низкий", "Средний", "Высокий", "Критический"];
+const SOURCE_LABEL: Record<AssignRule["source"], string> = { any: "Любой", telegram: "Telegram", crm: "CRM" };
+
+function RulesTab() {
+  const [rules, setRules] = useState<AssignRule[] | null>(null);
+  const [saving, setSaving] = useState(false);
+  const employees = useEmployees();
+  useEffect(() => { fetchAssignRules().then(setRules).catch(() => setRules([])); }, []);
+
+  const upd = (i: number, patch: Partial<AssignRule>) =>
+    setRules((r) => r!.map((x, xi) => xi === i ? { ...x, ...patch } : x));
+
+  const save = async () => {
+    if (!rules) return;
+    setSaving(true);
+    try {
+      const r = await saveAssignRules(rules);
+      if (r.ok) toast("Правила сохранены — применяются к новым задачам сразу");
+      else toast(r.error || "Не удалось сохранить");
+    } finally { setSaving(false); }
+  };
+
+  if (!rules) return <Card><div className="p-8 text-center text-sm text-slate-400">Загрузка…</div></Card>;
+
+  return (
+    <Card>
+      <CardHeader title="Правила автораспределения" action={
+        <button onClick={() => setRules([...rules, {
+          id: "rule" + Date.now().toString(36), name: "Новое правило", enabled: true, source: "any", keywords: [], assignTo: "least_loaded", priority: null, dueDays: null,
+        }])} className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-[12.5px] font-medium hover:bg-slate-50">
+          <Plus className="size-3.5" /> Правило
+        </button>
+      } />
+      <div className="divide-y divide-slate-100">
+        {rules.map((r, i) => (
+          <div key={r.id} className="flex flex-wrap items-start gap-3 px-5 py-4">
+            <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-xs font-bold text-brand-600">{i + 1}</span>
+            <div className="min-w-0 flex-1 space-y-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <input value={r.name} onChange={(e) => upd(i, { name: e.target.value })}
+                  className="w-56 rounded-lg border border-slate-200 px-2.5 py-1.5 text-[13px] font-medium focus:border-brand-500 focus:outline-none" />
+                <select value={r.source} onChange={(e) => upd(i, { source: e.target.value as AssignRule["source"] })}
+                  className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-[13px] focus:border-brand-500 focus:outline-none">
+                  {(["any", "telegram", "crm"] as const).map((s) => <option key={s} value={s}>{SOURCE_LABEL[s]}</option>)}
+                </select>
+                <select value={r.priority ?? ""} onChange={(e) => upd(i, { priority: e.target.value || null })}
+                  className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-[13px] focus:border-brand-500 focus:outline-none">
+                  <option value="">Без приоритета</option>
+                  {PRIORITY_OPTIONS.map((p) => <option key={p} value={p}>{p}</option>)}
+                </select>
+                <input value={r.dueDays ?? ""} onChange={(e) => upd(i, { dueDays: e.target.value === "" ? null : Number(e.target.value.replace(/\D/g, "")) })}
+                  placeholder="Срок, дней" className="w-24 rounded-lg border border-slate-200 px-2.5 py-1.5 text-[13px] focus:border-brand-500 focus:outline-none" />
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <input value={r.keywords.join(", ")} placeholder="Ключевые слова через запятую (пусто = совпадает всегда)"
+                  onChange={(e) => upd(i, { keywords: e.target.value.split(",").map((v) => v.trimStart()) })}
+                  onBlur={(e) => upd(i, { keywords: e.target.value.split(",").map((v) => v.trim().toLowerCase()).filter(Boolean) })}
+                  className="min-w-64 flex-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-[13px] focus:border-brand-500 focus:outline-none" />
+                <select value={r.assignTo} onChange={(e) => upd(i, { assignTo: e.target.value })}
+                  className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-[13px] focus:border-brand-500 focus:outline-none">
+                  <option value="least_loaded">→ Наименее загруженный</option>
+                  {employees.map((e) => <option key={e.id} value={e.id}>→ {e.name}</option>)}
+                </select>
+              </div>
+            </div>
+            <Toggle checked={r.enabled} onChange={() => upd(i, { enabled: !r.enabled })} />
+            <button onClick={() => setRules(rules.filter((_, xi) => xi !== i))} className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"><Trash2 className="size-4" /></button>
+          </div>
+        ))}
+        {!rules.length && <p className="px-5 py-8 text-center text-sm text-slate-400">Правил пока нет — новые задачи остаются без исполнителя, как раньше.</p>}
+      </div>
+      <div className="flex items-center justify-between border-t border-slate-100 px-5 py-3.5">
+        <span className="text-[12.5px] text-slate-400">Правила проверяются по порядку сверху вниз, срабатывает первое совпавшее. Применяются к новым задачам из CRM и Telegram-бота.</span>
+        <button onClick={save} disabled={saving} className="rounded-lg bg-brand-600 px-4 py-2 text-[13px] font-medium text-white hover:bg-brand-700 disabled:opacity-50">
+          {saving ? "Сохранение…" : "Сохранить"}
+        </button>
+      </div>
+    </Card>
+  );
+}
+
 export default function Settings() {
   const [tab, setTab] = useState<TabId>("users");
   const [logFilter, setLogFilter] = useState<"all" | "tg" | "crm">("all");
+  const [logPeriod, setLogPeriod] = useState("live");
   const [live, setLive] = useState<LogView[] | null>(null);
   const [logsLoading, setLogsLoading] = useState(false);
   const employees = useEmployees();
   useEffect(() => { void hydrateEmployees(); }, []);
+  const monthOptions = useMemo(() => {
+    const opts = [{ v: "live", l: "Живые (последние 500)" }];
+    const d = new Date();
+    for (let i = 0; i < 6; i++) {
+      const m = new Date(d.getFullYear(), d.getMonth() - i, 1);
+      const v = m.toISOString().slice(0, 7);
+      opts.push({ v, l: m.toLocaleDateString("ru-RU", { month: "long", year: "numeric" }) });
+    }
+    return opts;
+  }, []);
   useEffect(() => {
-    if (tab !== "logs" || live) return;
+    if (tab !== "logs") return;
     setLogsLoading(true);
-    Promise.all([fetchLogs("telegram"), fetchLogs("crm")])
+    setLive(null);
+    const fetchers = logPeriod === "live"
+      ? [fetchLogs("telegram"), fetchLogs("crm")]
+      : [fetchLogsArchive("telegram", logPeriod), fetchLogsArchive("crm", logPeriod)];
+    Promise.all(fetchers)
       .then(([tg, crm]) => {
         const rows = [...tg.map((l) => mapLog(l, "tg")), ...crm.map((l) => mapLog(l, "crm"))]
           .sort((a, b) => ((a.ts ?? "") < (b.ts ?? "") ? 1 : -1));
@@ -138,7 +234,7 @@ export default function Settings() {
       })
       .catch(() => setLive([]))
       .finally(() => setLogsLoading(false));
-  }, [tab, live]);
+  }, [tab, logPeriod]);
   const allLogs: LogView[] = live ?? [];
   const shownLogs = allLogs.filter((l) => logFilter === "all" || l.src === logFilter);
 
@@ -206,28 +302,7 @@ export default function Settings() {
         </div>
       )}
 
-      {tab === "rules" && (
-        <Card>
-          <CardHeader title="Правила автораспределения" action={<Badge tone="yellow">Демо — пока не влияет на реальное назначение задач</Badge>} />
-          <div className="divide-y divide-slate-100">
-            {[
-              { n: 1, title: "Обращения из Telegram → ответственный бухгалтер", desc: "Источник: Telegram · Приоритет: Средний · Срок: 2 рабочих дня", on: true },
-              { n: 2, title: "Задачи без исполнителя → наименее загруженный", desc: "Источник: любой · учитывается текущая загрузка", on: true },
-              { n: 3, title: "Требования госорганов → налоговый консультант", desc: "Ключевые слова: «требование», «проверка» · Критический · 1 день", on: true },
-              { n: 4, title: "Зарплатные задачи → бухгалтер по зарплате", desc: "Ключевые слова: «зарплата», «отпускные» · отключено", on: false },
-            ].map((r) => (
-              <div key={r.n} className="flex items-center gap-4 px-5 py-4">
-                <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-xs font-bold text-brand-600">{r.n}</span>
-                <div className="min-w-0 flex-1">
-                  <div className="text-[13.5px] font-medium">{r.title}</div>
-                  <div className="text-xs text-slate-400">{r.desc}</div>
-                </div>
-                <Toggle defaultChecked={r.on} />
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
+      {tab === "rules" && <RulesTab />}
 
       {tab === "notif" && <NotifTab />}
 
@@ -242,9 +317,13 @@ export default function Settings() {
                 {l}
               </button>
             ))}
+            <select value={logPeriod} onChange={(e) => setLogPeriod(e.target.value)}
+              className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium capitalize focus:border-brand-500 focus:outline-none">
+              {monthOptions.map((o) => <option key={o.v} value={o.v}>{o.l}</option>)}
+            </select>
             <span className="ml-auto flex items-center gap-1.5 text-xs text-slate-400">
               {allLogs.length > 0 && <span className="size-1.5 animate-pulse rounded-full bg-emerald-500" />}
-              {logsLoading ? "загрузка…" : allLogs.length ? "живые данные · хранятся последние 500" : "записей пока нет"}
+              {logsLoading ? "загрузка…" : allLogs.length ? (logPeriod === "live" ? "живые данные · последние 500" : "архив за месяц · до 10 000 записей") : "записей пока нет"}
             </span>
           </div>
           {shownLogs.length ? (

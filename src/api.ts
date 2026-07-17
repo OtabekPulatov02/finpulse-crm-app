@@ -120,6 +120,9 @@ export const fetchBotTasks = () =>
 export const fetchLogs = (src: "telegram" | "crm") =>
   get<{ ok: boolean; logs: LogRow[] }>(`r=logs&src=${src}`).then((d) => d.logs ?? []);
 
+export const fetchLogsArchive = (src: "telegram" | "crm", month: string) =>
+  get<{ ok: boolean; logs: LogRow[]; count?: number }>(`r=logs_archive&src=${src}&month=${month}`).then((d) => d.logs ?? []);
+
 export const fetchPending = () =>
   get<{ ok: boolean; pending: PendingClient[] }>("r=pending").then((d) => d.pending ?? []);
 
@@ -394,6 +397,7 @@ export const addOpsPack = (clientId: string, packs = 1) =>
 export interface Dicts {
   calendarEventTypes: string[];
   paymentCategories: string[];
+  taxCategories: string[];
   reminderIntervals: string[];
   repeatPeriods: string[];
 }
@@ -403,6 +407,24 @@ export const fetchDicts = () =>
 
 export const saveDicts = (dicts: Dicts) =>
   post<{ ok: boolean; dicts?: Dicts; error?: string }>({ action: "dicts_save", dicts });
+
+/* ---------------- Автораспределение задач ---------------- */
+export interface AssignRule {
+  id: string;
+  name: string;
+  enabled: boolean;
+  source: "any" | "telegram" | "crm";
+  keywords: string[];
+  assignTo: string; // "least_loaded" | employeeId
+  priority: string | null;
+  dueDays: number | null;
+}
+
+export const fetchAssignRules = () =>
+  get<{ ok: boolean; rules: AssignRule[] }>("r=assign_rules").then((d) => d.rules ?? []);
+
+export const saveAssignRules = (rules: AssignRule[]) =>
+  post<{ ok: boolean; rules?: AssignRule[]; error?: string }>({ action: "assign_rules_save", rules });
 
 /* ---------------- 1С (Clobus) ---------------- */
 const API_1C = `${ORIGIN}/api/1c`;

@@ -251,7 +251,10 @@ function ClientsDicts() {
   );
 }
 
-/* ---------------- Календарь: 4 реальных редактируемых справочника ---------------- */
+/* ---------------- Календарь: платёжные/налоговые подсказки — реальные;
+   типы событий, интервалы и периодичность — жёстко зашиты в код (цвета,
+   иконки, фильтры и маппинг на бэкенд), поэтому оставлены только для
+   просмотра, а не свободного редактирования, чтобы не сломать сопоставление. ---------------- */
 function CalendarDicts() {
   const [dicts, setDicts] = useState<Dicts | null>(null);
   useEffect(() => { fetchDicts().then(setDicts).catch(() => setDicts(null)); }, []);
@@ -265,11 +268,41 @@ function CalendarDicts() {
   };
 
   return (
-    <div className="grid grid-cols-2 gap-4 max-lg:grid-cols-1">
-      <EditableListCard title="Типы событий календаря" items={dicts.calendarEventTypes} placeholder="Новый тип" onSave={saveField("calendarEventTypes")} />
-      <EditableListCard title="Категории платежей" items={dicts.paymentCategories} placeholder="Новая категория" onSave={saveField("paymentCategories")} />
-      <EditableListCard title="Интервалы напоминаний" items={dicts.reminderIntervals} placeholder="Например: за 2 недели" onSave={saveField("reminderIntervals")} />
-      <EditableListCard title="Периодичность повторов" items={dicts.repeatPeriods} placeholder="Например: каждые 2 недели" onSave={saveField("repeatPeriods")} />
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-4 max-lg:grid-cols-1">
+        <EditableListCard
+          title="Категории платежей"
+          hint="Подсказки при создании напоминания-платежа в календаре — реально влияют на форму."
+          items={dicts.paymentCategories} placeholder="Новая категория" onSave={saveField("paymentCategories")} />
+        <EditableListCard
+          title="Категории налогов/отчётов"
+          hint="Подсказки при создании напоминания-налога в календаре — реально влияют на форму."
+          items={dicts.taxCategories} placeholder="Новая категория" onSave={saveField("taxCategories")} />
+      </div>
+
+      <div className="grid grid-cols-3 gap-4 max-lg:grid-cols-1">
+        <Card>
+          <CardHeader title="Типы событий календаря" />
+          <div className="divide-y divide-slate-100">
+            {dicts.calendarEventTypes.map((t) => <div key={t} className="px-5 py-3 text-[13.5px] font-medium">{t}</div>)}
+          </div>
+          <p className="border-t border-slate-100 px-5 py-2.5 text-xs text-slate-400">Системные — у каждого свой цвет/иконка/фильтр в коде календаря.</p>
+        </Card>
+        <Card>
+          <CardHeader title="Интервалы напоминаний" />
+          <div className="divide-y divide-slate-100">
+            {dicts.reminderIntervals.map((t) => <div key={t} className="px-5 py-3 text-[13.5px] font-medium">{t}</div>)}
+          </div>
+          <p className="border-t border-slate-100 px-5 py-2.5 text-xs text-slate-400">Системные — каждый жёстко привязан к числу дней в форме напоминания.</p>
+        </Card>
+        <Card>
+          <CardHeader title="Периодичность повторов" />
+          <div className="divide-y divide-slate-100">
+            {dicts.repeatPeriods.map((t) => <div key={t} className="px-5 py-3 text-[13.5px] font-medium">{t}</div>)}
+          </div>
+          <p className="border-t border-slate-100 px-5 py-2.5 text-xs text-slate-400">Системные — соответствуют фиксированным значениям на бэкенде.</p>
+        </Card>
+      </div>
     </div>
   );
 }

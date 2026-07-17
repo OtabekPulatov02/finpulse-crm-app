@@ -6,7 +6,7 @@ import { useTasks } from "../store/tasks";
 import { hydrateClients, useClients } from "../store/clients";
 import { createCalendarEvent, hydrateCalendarEvents, removeCalendarEvent, useCalendarEvents } from "../store/calendarEvents";
 import type { CalendarEventEntry } from "../api";
-import { fetch1cReports } from "../api";
+import { fetch1cReports, fetchDicts, type Dicts } from "../api";
 import { formatSumsInText } from "../lib/amount";
 
 type EvType = "tax" | "pay" | "task" | "report";
@@ -129,9 +129,11 @@ export default function Calendar() {
   const [nRepeat, setNRepeat] = useState("Ежемесячно");
   const [nRemind, setNRemind] = useState("за 3 дня");
   const [saving, setSaving] = useState(false);
+  const [dicts, setDicts] = useState<Dicts | null>(null);
+  useEffect(() => { fetchDicts().then(setDicts).catch(() => setDicts(null)); }, []);
   const suggests = nType === "pay"
-    ? ["Аренда офиса", "Интернет и связь", "Коммунальные", "Лизинг", "Страховка"]
-    : ["Оплата НДС", "Аванс по УСН", "НДФЛ и соцвзносы", "Отчёт в статистику"];
+    ? (dicts?.paymentCategories?.length ? dicts.paymentCategories : ["Аренда офиса", "Интернет и связь", "Коммунальные", "Лизинг", "Страховка"])
+    : (dicts?.taxCategories?.length ? dicts.taxCategories : ["Оплата НДС", "Аванс по УСН", "НДФЛ и соцвзносы", "Отчёт в статистику"]);
   const companyOptions = ["Все клиенты", ...clients.map((c) => c.company)];
 
   const createReminder = async () => {
