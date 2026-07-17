@@ -255,6 +255,50 @@ function ClientsDicts() {
    типы событий, интервалы и периодичность — жёстко зашиты в код (цвета,
    иконки, фильтры и маппинг на бэкенд), поэтому оставлены только для
    просмотра, а не свободного редактирования, чтобы не сломать сопоставление. ---------------- */
+function ReminderTypeLabelsCard({ dicts, onSaved }: { dicts: Dicts; onSaved: (d: Dicts) => void }) {
+  const [tax, setTax] = useState(dicts.reminderTypeLabels.tax);
+  const [pay, setPay] = useState(dicts.reminderTypeLabels.pay);
+  const [saving, setSaving] = useState(false);
+  const dirty = tax !== dicts.reminderTypeLabels.tax || pay !== dicts.reminderTypeLabels.pay;
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      const next = { ...dicts, reminderTypeLabels: { tax, pay } };
+      const r = await saveDicts(next);
+      if (!r.ok) { toast(r.error || "Не удалось сохранить"); return; }
+      onSaved(next);
+      toast("Названия типов напоминаний сохранены");
+    } finally { setSaving(false); }
+  };
+
+  return (
+    <Card>
+      <CardHeader title="Типы напоминания (дропдаун при создании)" />
+      <div className="grid grid-cols-2 gap-4 p-5 max-lg:grid-cols-1">
+        <div>
+          <div className="mb-1.5 text-[13px] font-medium text-slate-500">Налоговый тип</div>
+          <input value={tax} onChange={(e) => setTax(e.target.value)}
+            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-[13px] focus:border-brand-500 focus:outline-none" />
+        </div>
+        <div>
+          <div className="mb-1.5 text-[13px] font-medium text-slate-500">Платёжный тип</div>
+          <input value={pay} onChange={(e) => setPay(e.target.value)}
+            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-[13px] focus:border-brand-500 focus:outline-none" />
+        </div>
+      </div>
+      <div className="flex items-center justify-between border-t border-slate-100 px-5 py-3.5">
+        <span className="text-[12.5px] text-slate-400">Два системных типа напоминания (налог/платёж) — можно переименовать подпись, но не добавить третий: логика формы и цвета в календаре завязаны именно на эти два.</span>
+        {dirty && (
+          <button onClick={save} disabled={saving} className="rounded-lg bg-brand-600 px-4 py-2 text-[13px] font-medium text-white hover:bg-brand-700 disabled:opacity-50">
+            {saving ? "Сохранение…" : "Сохранить"}
+          </button>
+        )}
+      </div>
+    </Card>
+  );
+}
+
 function CalendarDicts() {
   const [dicts, setDicts] = useState<Dicts | null>(null);
   useEffect(() => { fetchDicts().then(setDicts).catch(() => setDicts(null)); }, []);
@@ -269,6 +313,8 @@ function CalendarDicts() {
 
   return (
     <div className="space-y-4">
+      <ReminderTypeLabelsCard dicts={dicts} onSaved={setDicts} />
+
       <div className="grid grid-cols-2 gap-4 max-lg:grid-cols-1">
         <EditableListCard
           title="Категории платежей"

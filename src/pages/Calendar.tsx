@@ -128,27 +128,56 @@ export default function Calendar() {
   });
   const [nRepeat, setNRepeat] = useState("Ежемесячно");
   const [nRemind, setNRemind] = useState("за 3 дня");
+  const [nCount, setNCount] = useState(""); // сколько раз материализовать вперёд; пусто = бессрочно (старое поведение)
   const [saving, setSaving] = useState(false);
   const [dicts, setDicts] = useState<Dicts | null>(null);
   useEffect(() => { fetchDicts().then(setDicts).catch(() => setDicts(null)); }, []);
   const suggests = nType === "pay"
     ? (dicts?.paymentCategories?.length ? dicts.paymentCategories : ["Аренда офиса", "Интернет и связь", "Коммунальные", "Лизинг", "Страховка"])
     : (dicts?.taxCategories?.length ? dicts.taxCategories : ["Оплата НДС", "Аванс по УСН", "НДФЛ и соцвзносы", "Отчёт в статистику"]);
+  const reminderTypeLabels = dicts?.reminderTypeLabels ?? { tax: "Налог / отчёт", pay: "Платёж фирмы" };
   const companyOptions = ["Все клиенты", ...clients.map((c) => c.company)];
+
+  /* Прибавляет один период повтора к дате — используется при материализации
+     нескольких конкретных occurrences сразу (см. ниже), той же логикой,
+     что и сервер применяет при само-продвижении напоминания в cron/reminders.js. */
+  const addPeriod = (d: Date, repeat: CalendarEventEntry["repeat"]) => {
+    const next = new Date(d);
+    if (repeat === "monthly") next.setMonth(next.getMonth() + 1);
+    else if (repeat === "quarterly") next.setMonth(next.getMonth() + 3);
+    else if (repeat === "yearly") next.setFullYear(next.getFullYear() + 1);
+    return next;
+  };
 
   const createReminder = async () => {
     if (!nTitle.trim()) { toast("Укажите название напоминания"); return; }
     setSaving(true);
-    const r = await createCalendarEvent({
-      type: nType, title: nTitle.trim(),
-      company: nCompany === "Все клиенты" ? null : nCompany,
-      date: nDate, repeat: REPEAT_VALUE[nRepeat], remindDays: REMIND_VALUE[nRemind],
-    });
+    const repeatVal = REPEAT_VALUE[nRepeat];
+    const count = repeatVal !== "once" ? Math.max(0, Math.min(60, Number(nCount) || 0)) : 0;
+    const company = nCompany === "Все клиенты" ? null : nCompany;
+
+    let ok = true; let lastError: string | undefined;
+    if (count > 1) {
+      /* Материализуем count конкретных occurrences сразу — каждая как
+         отдельное событие repeat:"once", чтобы календарь реально показывал
+         все будущие даты, а не только одну самопродвигающуюся запись. */
+      let d = parseISODate(nDate);
+      for (let i = 0; i < count; i++) {
+        const dateStr = d.toISOString().slice(0, 10);
+        const r = await createCalendarEvent({ type: nType, title: nTitle.trim(), company, date: dateStr, repeat: "once", remindDays: REMIND_VALUE[nRemind] });
+        if (!r.ok) { ok = false; lastError = r.error; break; }
+        d = addPeriod(d, repeatVal);
+      }
+    } else {
+      const r = await createCalendarEvent({ type: nType, title: nTitle.trim(), company, date: nDate, repeat: repeatVal, remindDays: REMIND_VALUE[nRemind] });
+      ok = r.ok; lastError = r.error;
+    }
+
     setSaving(false);
-    if (!r.ok) { toast(r.error || "Не удалось создать напоминание"); return; }
+    if (!ok) { toast(lastError || "Не удалось создать напоминание"); return; }
     setCur(new Date(parseISODate(nDate).getFullYear(), parseISODate(nDate).getMonth(), 1));
-    setShowNew(false); setNTitle("");
-    toast(`Напоминание создано · бот напомнит ${nRemind}`);
+    setShowNew(false); setNTitle(""); setNCount("");
+    toast(count > 1 ? `Создано ${count} напоминаний · бот напомнит ${nRemind} перед каждым` : `Напоминание создано · бот напомнит ${nRemind}`);
   };
 
   const inp = "w-full rounded-lg border border-slate-200 px-3 py-2 text-[13px] focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none";
@@ -283,13 +312,12 @@ export default function Calendar() {
           </button>
         </>}>
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-2.5">
-            {([["tax", "🧾", "Налог / отчёт"], ["pay", "💳", "Платёж фирмы"]] as const).map(([v, emoji, label]) => (
-              <button key={v} onClick={() => setNType(v)}
-                className={`flex items-center gap-2.5 rounded-xl border-2 p-3 text-left text-sm font-semibold transition ${nType === v ? "border-brand-500 bg-brand-50" : "border-slate-200 hover:border-slate-300"}`}>
-                <span className="text-xl">{emoji}</span>{label}
-              </button>
-            ))}
+          <div>
+            <label className="mb-1.5 block text-[13px] font-medium">Тип напоминания</label>
+            <select value={nType} onChange={(e) => setNType(e.target.value as "tax" | "pay")} className={inp}>
+              <option value="tax">🧾 {reminderTypeLabels.tax}</option>
+              <option value="pay">💳 {reminderTypeLabels.pay}</option>
+            </select>
           </div>
           <div>
             <label className="mb-1.5 block text-[13px] font-medium">Что напомнить <span className="text-red-500">*</span></label>
@@ -323,6 +351,14 @@ export default function Calendar() {
                 {Object.keys(REMIND_VALUE).map((c) => <option key={c}>{c}</option>)}
               </select>
             </div>
+            {nRepeat !== "Однократно" && (
+              <div className="col-span-2">
+                <label className="mb-1.5 block text-[13px] font-medium">Сколько раз заранее заполнить календарь</label>
+                <input value={nCount} onChange={(e) => setNCount(e.target.value.replace(/\D/g, ""))}
+                  placeholder="Пусто = напоминание бессрочное, продвигается само по одному разу" className={inp} />
+                <p className="mt-1.5 text-xs text-slate-400">Если указать число — календарь сразу заполнится этим числом конкретных дат вперёд (например, 12 = год вперёд при «Ежемесячно»). Если оставить пустым — как раньше: одно напоминание, которое сдвигается на следующую дату после срабатывания.</p>
+              </div>
+            )}
           </div>
           <p className="flex items-center gap-2 text-xs text-slate-400"><Send className="size-3.5" />Бот напомнит в Telegram-группе при приближении срока.</p>
         </div>

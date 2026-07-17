@@ -400,6 +400,7 @@ export interface Dicts {
   taxCategories: string[];
   reminderIntervals: string[];
   repeatPeriods: string[];
+  reminderTypeLabels: { tax: string; pay: string };
 }
 
 export const fetchDicts = () =>
